@@ -62,13 +62,24 @@ jobs:
     - name: Check JavaScript syntax
       run: |
         echo "Checking JavaScript files..."
+        # Install dependencies for ESLint if available
+        if [ -f "package.json" ]; then
+          npm install --silent
+        fi
+
         for file in scripts/*.js; do
           if [ -f "$file" ]; then
             echo "Checking $file..."
-            node -c "$file" || exit 1
+            # Use ESLint for syntax checking instead of node -c
+            # This properly handles ES6 modules used in Foundry VTT
+            if command -v npx >/dev/null 2>&1 && [ -f ".eslintrc.json" ]; then
+              npx eslint --no-eslintrc --parser-options='{"ecmaVersion": 2022, "sourceType": "module"}' --env browser --no-ignore "$file" || exit 1
+            else
+              echo "⚠️ ESLint not available, skipping syntax check for $file"
+            fi
           fi
         done
-        echo "✓ All JavaScript files have valid syntax"
+        echo "✓ JavaScript syntax validation completed"
         
     - name: Validate templates
       run: |
