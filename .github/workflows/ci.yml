@@ -1,0 +1,95 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run ESLint
+      run: npm run lint
+      
+    - name: Validate module.json
+      run: |
+        # Check if module.json is valid JSON
+        node -e "JSON.parse(require('fs').readFileSync('module.json', 'utf8'))"
+        echo "✅ module.json is valid JSON"
+        
+        # Check required fields
+        node -e "
+          const manifest = JSON.parse(require('fs').readFileSync('module.json', 'utf8'));
+          const required = ['id', 'title', 'description', 'version', 'authors', 'scripts', 'styles'];
+          const missing = required.filter(field => !manifest[field]);
+          if (missing.length > 0) {
+            console.error('❌ Missing required fields:', missing.join(', '));
+            process.exit(1);
+          }
+          console.log('✅ All required fields present in module.json');
+        "
+        
+    - name: Check file structure
+      run: |
+        # Check that all referenced files exist
+        echo "🔍 Checking file structure..."
+        
+        # Check scripts
+        if [ ! -d "scripts" ]; then
+          echo "❌ scripts directory missing"
+          exit 1
+        fi
+        
+        # Check styles
+        if [ ! -d "styles" ]; then
+          echo "❌ styles directory missing"
+          exit 1
+        fi
+        
+        # Check templates
+        if [ ! -d "templates" ]; then
+          echo "❌ templates directory missing"
+          exit 1
+        fi
+        
+        # Check language files
+        if [ ! -d "lang" ]; then
+          echo "❌ lang directory missing"
+          exit 1
+        fi
+        
+        echo "✅ File structure is valid"
+        
+    - name: Check for TODO/FIXME comments
+      run: |
+        echo "🔍 Checking for TODO/FIXME comments..."
+        TODO_COUNT=$(grep -r "TODO\|FIXME" scripts/ || true | wc -l)
+        if [ $TODO_COUNT -gt 0 ]; then
+          echo "⚠️ Found $TODO_COUNT TODO/FIXME comments:"
+          grep -r "TODO\|FIXME" scripts/ || true
+        else
+          echo "✅ No TODO/FIXME comments found"
+        fi
+        
+    - name: Generate build summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ ESLint passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ module.json validated" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ File structure verified" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 Ready for release" >> $GITHUB_STEP_SUMMARY

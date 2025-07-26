@@ -54,6 +54,11 @@ A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5
 ### Available Commands
 - `npm run lint` - Check for linting issues
 - `npm run lint:fix` - Auto-fix linting issues
+- `npm run release` - Create a new release (interactive)
+- `npm run release:patch` - Create a patch release (0.0.X)
+- `npm run release:minor` - Create a minor release (0.X.0)
+- `npm run release:major` - Create a major release (X.0.0)
+- `npm run quick-release` - Quick patch release
 
 ### Git Hooks
 The repository includes a pre-commit hook that automatically runs ESLint on JavaScript files before each commit. This ensures code quality and consistency.
@@ -62,6 +67,51 @@ To bypass the hook (not recommended):
 ```bash
 git commit --no-verify
 ```
+
+## Automated Release Process
+
+### Quick Release (Recommended)
+For most updates, simply run:
+```bash
+./quick-release.sh
+```
+This will:
+1. Run linting checks
+2. Bump the patch version (e.g., 0.0.1 → 0.0.2)
+3. Update version in module.json and package.json
+4. Commit and push changes
+5. Create and push a git tag
+6. Trigger automated GitHub Actions release
+
+### Manual Release
+For more control over the release type:
+```bash
+# Patch release (bug fixes)
+./scripts/release.sh patch
+
+# Minor release (new features)
+./scripts/release.sh minor
+
+# Major release (breaking changes)
+./scripts/release.sh major
+```
+
+### GitHub Actions Release
+You can also create releases directly from GitHub:
+1. Go to **Actions** tab
+2. Select **Version Bump and Release**
+3. Click **Run workflow**
+4. Choose version type or enter custom version
+5. Click **Run workflow**
+
+### What Happens Automatically
+When a release is created, GitHub Actions will:
+- ✅ Run linting checks
+- ✅ Generate changelog from commit messages
+- ✅ Update module.json version
+- ✅ Create properly structured zip file
+- ✅ Create GitHub release with assets
+- ✅ Update release notes automatically
 
 ### Method 2: Manual Installation
 1. Download the latest release from [GitHub Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)

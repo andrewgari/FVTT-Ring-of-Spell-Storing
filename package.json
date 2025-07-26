@@ -6,7 +6,12 @@
   "scripts": {
     "lint": "eslint scripts/**/*.js",
     "lint:fix": "eslint scripts/**/*.js --fix",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "echo \"No tests specified\" && exit 0",
+    "release": "./scripts/release.sh",
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major",
+    "quick-release": "./quick-release.sh"
   },
   "keywords": [
     "foundry-vtt",

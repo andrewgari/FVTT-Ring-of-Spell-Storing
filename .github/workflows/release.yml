@@ -11,15 +11,50 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+      with:
+        fetch-depth: 0  # Fetch full history for changelog generation
+
     - name: Extract version from tag
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
       
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        if [ -z "$PREV_TAG" ]; then
+          echo "CHANGELOG=Initial release" >> $GITHUB_OUTPUT
+        else
+          # Generate changelog from commits since last tag
+          CHANGELOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD | grep -v "^- Merge" | head -20)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Minor updates and bug fixes"
+          fi
+          # Escape newlines for GitHub output
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          echo "CHANGELOG=$CHANGELOG" >> $GITHUB_OUTPUT
+        fi
+
     - name: Update module.json version
       run: |
         sed -i 's/"version": ".*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' module.json
@@ -55,8 +90,11 @@ jobs:
           https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json
           ```
 
-          ### Changes
-          See [CHANGELOG.md](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/CHANGELOG.md) for detailed changes.
+          ### Changes in this Release
+          ${{ steps.changelog.outputs.CHANGELOG }}
+
+          ### Full Documentation
+          See [CHANGELOG.md](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/CHANGELOG.md) for complete change history.
         files: ring-of-spell-storing.zip
         draft: false
         prerelease: false
