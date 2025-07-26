@@ -94,6 +94,7 @@ class RingOfSpellStoring {
   static initializeAPI() {
     game.modules.get(MODULE_ID).api = {
       findRingOnActor: this.findRingOnActor.bind(this),
+      findRingsOnActor: this.findRingsOnActor.bind(this),
       storeSpellInRing: this.storeSpellInRing.bind(this),
       castSpellFromRing: this.castSpellFromRing.bind(this),
       removeSpellFromRing: this.removeSpellFromRing.bind(this),
@@ -122,33 +123,32 @@ class RingOfSpellStoring {
       return;
     }
 
-    const ring = this.findRingOnActor(actor);
-    if (!ring) {
+    const rings = this.findRingsOnActor(actor);
+    if (rings.length === 0) {
       return;
     }
 
-    const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
-    const storedSpells = ringData.storedSpells || [];
+    console.log(`${MODULE_ID} | Preparing ring spells for ${actor.name} (${rings.length} rings)`);
 
-    if (storedSpells.length === 0) {
-      return;
-    }
+    // Add ring spell data for each ring
+    rings.forEach((ring, index) => {
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      const storedSpells = ringData.storedSpells || [];
 
-    console.log(`${MODULE_ID} | Preparing ${storedSpells.length} ring spells for ${actor.name}`);
-
-    // Add ring spells to actor's spell data for display
-    if (!actor.system.spells.ring) {
-      actor.system.spells.ring = {
-        value: storedSpells.length,
-        max: MAX_SPELL_LEVELS,
-        override: null,
-        label: game.i18n.localize('RING_OF_SPELL_STORING.SpellList.SectionTitle')
-      };
-    }
+      if (storedSpells.length > 0) {
+        const ringKey = `ring${index + 1}`;
+        actor.system.spells[ringKey] = {
+          value: storedSpells.length,
+          max: MAX_SPELL_LEVELS,
+          override: null,
+          label: `${ring.name} (${storedSpells.reduce((sum, s) => sum + s.level, 0)}/${MAX_SPELL_LEVELS})`
+        };
+      }
+    });
   }
 
   /**
-   * Handle actor sheet rendering to add ring spell section
+   * Handle actor sheet rendering to add ring spell sections
    */
   static onRenderActorSheet(sheet, html, _data) {
     console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name}`);
@@ -165,10 +165,10 @@ class RingOfSpellStoring {
     }
 
     const actor = sheet.actor;
-    const ring = this.findRingOnActor(actor);
+    const rings = this.findRingsOnActor(actor);
 
-    if (ring) {
-      this.addRingSpellsToSpellList(html, actor, ring);
+    if (rings.length > 0) {
+      this.addAllRingSpellsToSpellList(html, actor, rings);
     }
   }
 
@@ -210,11 +210,12 @@ class RingOfSpellStoring {
     // Check if this is a ring spell that was just cast
     if (item.flags?.[MODULE_ID]?.isRingSpell) {
       const actor = item.parent;
-      const ring = this.findRingOnActor(actor);
+      const ringId = item.flags[MODULE_ID].ringId;
+      const ring = ringId ? actor.items.get(ringId) : this.findRingOnActor(actor);
 
       if (ring) {
         const ringSpellIndex = item.flags[MODULE_ID].ringSpellIndex;
-        console.log(`${MODULE_ID} | Ring spell cast, removing from ring: ${item.name}`);
+        console.log(`${MODULE_ID} | Ring spell cast, removing from ring: ${item.name} (Ring: ${ring.name})`);
 
         // Remove the spell from the ring
         await this.removeSpellFromRing(actor, ring, ringSpellIndex);
@@ -258,35 +259,36 @@ class RingOfSpellStoring {
   }
 
   /**
-   * Find Ring of Spell Storing on an actor
+   * Find all Rings of Spell Storing on an actor
+   */
+  static findRingsOnActor(actor) {
+    const rings = [];
+
+    // Find all equipped rings that match our criteria
+    actor.items.forEach(item => {
+      if (item.type === 'equipment' && item.system.equipped) {
+        // Check for exact name match
+        if (item.name === RING_ITEM_NAME) {
+          rings.push(item);
+        } else if (item.name.toLowerCase().includes('ring of spell storing')) {
+          // Check for case-insensitive partial match
+          rings.push(item);
+        } else if (item.name.toLowerCase().includes('spell storing')) {
+          // Check for any ring with spell storing in the name
+          rings.push(item);
+        }
+      }
+    });
+
+    return rings;
+  }
+
+  /**
+   * Find Ring of Spell Storing on an actor (legacy method - returns first ring)
    */
   static findRingOnActor(actor) {
-    // First try exact name match
-    let ring = actor.items.find(item =>
-      item.name === RING_ITEM_NAME &&
-      item.type === 'equipment' &&
-      item.system.equipped
-    );
-
-    // If not found, try case-insensitive partial match
-    if (!ring) {
-      ring = actor.items.find(item =>
-        item.name.toLowerCase().includes('ring of spell storing') &&
-        item.type === 'equipment' &&
-        item.system.equipped
-      );
-    }
-
-    // If still not found, try any ring with spell storing in the name
-    if (!ring) {
-      ring = actor.items.find(item =>
-        item.name.toLowerCase().includes('spell storing') &&
-        item.type === 'equipment' &&
-        item.system.equipped
-      );
-    }
-
-    return ring;
+    const rings = this.findRingsOnActor(actor);
+    return rings.length > 0 ? rings[0] : null;
   }
 
   /**
@@ -299,18 +301,10 @@ class RingOfSpellStoring {
   }
 
   /**
-   * Add ring spells to the spell list on character sheet
+   * Add all ring spells to the spell list on character sheet
    */
-  static async addRingSpellsToSpellList(html, actor, ring) {
-    console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name}`);
-
-    const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
-    const storedSpells = ringData.storedSpells || [];
-
-    if (storedSpells.length === 0) {
-      console.log(`${MODULE_ID} | No ring spells to display`);
-      return;
-    }
+  static async addAllRingSpellsToSpellList(html, actor, rings) {
+    console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name} (${rings.length} rings)`);
 
     // Find the spells tab
     const spellsTab = html.find('.tab[data-tab="spells"]');
@@ -322,19 +316,48 @@ class RingOfSpellStoring {
     // Remove any existing ring spell sections
     html.find('.ring-spells-section').remove();
 
+    // Add a section for each ring
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+      const ring = rings[ringIndex];
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      const storedSpells = ringData.storedSpells || [];
+
+      if (storedSpells.length === 0) {
+        continue; // Skip rings with no spells
+      }
+
+      await this.addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab);
+    }
+  }
+
+  /**
+   * Add spells from a single ring to the spell list
+   */
+  static async addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab) {
+    const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+    const storedSpells = ringData.storedSpells || [];
+
+    // Create unique ring identifier
+    const ringId = ring.id;
+    const usedLevels = storedSpells.reduce((sum, s) => sum + s.level, 0);
+
     // Create ring spells section
     const ringSpellsSection = $(`
-      <div class="ring-spells-section" style="margin-top: 10px; border-top: 2px solid #8b4513; padding-top: 10px;">
+      <div class="ring-spells-section" data-ring-id="${ringId}" style="margin-top: 10px; border-top: 2px solid #8b4513; padding-top: 10px;">
         <div class="ring-spells-header" style="display: flex; align-items: center; margin-bottom: 8px;">
           <h3 style="margin: 0; color: #8b4513; font-size: 14px;">
             <i class="fas fa-ring" style="margin-right: 5px;"></i>
-            ${game.i18n.localize('RING_OF_SPELL_STORING.SpellList.SectionTitle')}
+            ${ring.name}
           </h3>
           <span style="margin-left: auto; font-size: 12px; color: #666;">
-            ${storedSpells.reduce((sum, s) => sum + s.level, 0)}/${MAX_SPELL_LEVELS} levels
+            ${usedLevels}/${MAX_SPELL_LEVELS} levels
           </span>
+          <button class="manage-ring-btn" data-ring-id="${ringId}"
+                  style="margin-left: 8px; background: #2196f3; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;">
+            <i class="fas fa-cog"></i> Manage
+          </button>
         </div>
-        <div class="ring-spells-list"></div>
+        <div class="ring-spells-list" data-ring-id="${ringId}"></div>
       </div>
     `);
 
@@ -343,24 +366,39 @@ class RingOfSpellStoring {
 
     for (let i = 0; i < storedSpells.length; i++) {
       const spellData = storedSpells[i];
-      const spellItem = await this.createRingSpellItem(actor, spellData, i);
+      // Include ring ID and index for proper identification
+      spellData.ringId = ringId;
+      spellData.ringIndex = ringIndex;
+      spellData.spellIndex = i;
+
+      const spellItem = await this.createRingSpellItem(actor, spellData, i, ringId);
 
       if (spellItem) {
-        const spellElement = await this.createRingSpellElement(spellItem, spellData);
+        const spellElement = await this.createRingSpellElement(spellItem, spellData, ringId);
         ringSpellsList.append(spellElement);
       }
     }
 
+    // Add manage button click handler
+    ringSpellsSection.find('.manage-ring-btn').on('click', (event) => {
+      event.preventDefault();
+      const ringId = event.currentTarget.dataset.ringId;
+      const ring = actor.items.get(ringId);
+      if (ring) {
+        this.openRingInterface(actor, ring);
+      }
+    });
+
     // Add the section to the spells tab
     spellsTab.append(ringSpellsSection);
 
-    console.log(`${MODULE_ID} | Added ${storedSpells.length} ring spells to spell list`);
+    console.log(`${MODULE_ID} | Added ${storedSpells.length} spells from ${ring.name}`);
   }
 
   /**
    * Create a temporary spell item for ring spells
    */
-  static async createRingSpellItem(actor, spellData, index) {
+  static async createRingSpellItem(actor, spellData, index, ringId = null) {
     try {
       // Try to find the original spell
       let originalSpell = game.items.get(spellData.id);
@@ -386,6 +424,7 @@ class RingOfSpellStoring {
       spellItemData.flags[MODULE_ID] = {
         isRingSpell: true,
         ringSpellIndex: index,
+        ringId: ringId || spellData.ringId,
         ringSpellData: spellData
       };
 
@@ -411,7 +450,7 @@ class RingOfSpellStoring {
   /**
    * Create HTML element for a ring spell
    */
-  static async createRingSpellElement(spellItem, spellData) {
+  static async createRingSpellElement(spellItem, spellData, ringId = null) {
     const spellElement = $(`
       <div class="ring-spell-item" style="display: flex; align-items: center; padding: 4px 8px; margin: 2px 0; background: #f9f9f9; border-radius: 3px; border-left: 3px solid #8b4513;">
         <div class="spell-level-indicator" style="width: 24px; height: 24px; background: #8b4513; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 8px;">
@@ -427,11 +466,15 @@ class RingOfSpellStoring {
           </div>
         </div>
         <div class="spell-actions" style="display: flex; gap: 4px;">
-          <button class="cast-ring-spell" data-spell-index="${spellData.ringSpellIndex || 0}"
+          <button class="cast-ring-spell"
+                  data-spell-index="${spellData.spellIndex || 0}"
+                  data-ring-id="${ringId || spellData.ringId}"
                   style="background: #4caf50; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 11px; cursor: pointer;">
             <i class="fas fa-magic"></i> Cast
           </button>
-          <button class="remove-ring-spell" data-spell-index="${spellData.ringSpellIndex || 0}"
+          <button class="remove-ring-spell"
+                  data-spell-index="${spellData.spellIndex || 0}"
+                  data-ring-id="${ringId || spellData.ringId}"
                   style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 11px; cursor: pointer;">
             <i class="fas fa-trash"></i>
           </button>
@@ -443,12 +486,15 @@ class RingOfSpellStoring {
     spellElement.find('.cast-ring-spell').on('click', async(event) => {
       event.preventDefault();
       const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
-      await this.castRingSpellFromList(spellItem.parent, spellIndex);
+      const ringId = event.currentTarget.dataset.ringId;
+      await this.castRingSpellFromList(spellItem.parent, spellIndex, ringId);
     });
 
     spellElement.find('.remove-ring-spell').on('click', async(event) => {
       event.preventDefault();
       const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
+      const ringId = event.currentTarget.dataset.ringId;
+
       const confirmed = await Dialog.confirm({
         title: game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.RemoveSpell.Title'),
         content: game.i18n.format('RING_OF_SPELL_STORING.Dialogs.RemoveSpell.Confirm', {
@@ -457,7 +503,7 @@ class RingOfSpellStoring {
       });
 
       if (confirmed) {
-        const ring = this.findRingOnActor(spellItem.parent);
+        const ring = spellItem.parent.items.get(ringId);
         if (ring) {
           await this.removeSpellFromRing(spellItem.parent, ring, spellIndex);
           // Re-render the sheet to update the spell list
@@ -529,12 +575,18 @@ class RingOfSpellStoring {
   /**
    * Cast a ring spell from the spell list
    */
-  static async castRingSpellFromList(actor, spellIndex) {
-    console.log(`${MODULE_ID} | Casting ring spell from list: index ${spellIndex}`);
+  static async castRingSpellFromList(actor, spellIndex, ringId = null) {
+    console.log(`${MODULE_ID} | Casting ring spell from list: index ${spellIndex}, ring ${ringId}`);
 
-    const ring = this.findRingOnActor(actor);
+    let ring;
+    if (ringId) {
+      ring = actor.items.get(ringId);
+    } else {
+      ring = this.findRingOnActor(actor);
+    }
+
     if (!ring) {
-      ui.notifications.error('No Ring of Spell Storing found');
+      ui.notifications.error('Ring of Spell Storing not found');
       return false;
     }
 
