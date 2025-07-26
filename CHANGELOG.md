@@ -1,3 +1,8 @@
+## [1.0.2] - 2025-07-26
+
+### Changes
+Initial release
+
 # Changelog
 
 All notable changes to the Ring of Spell Storing module will be documented in this file.
