@@ -16,6 +16,13 @@
       "SpellSaveDC": "Spell Save DC",
       "Close": "Close"
     },
+    "SpellList": {
+      "SectionTitle": "Ring of Spell Storing",
+      "CastSpell": "Cast",
+      "RemoveSpell": "Remove",
+      "OriginalCaster": "Cast by {caster}",
+      "SpellStats": "Attack: +{attack}, DC: {dc}"
+    },
     "Notifications": {
       "SpellStored": "Spell {spell} (Level {level}) stored in the Ring of Spell Storing by {caster}.",
       "SpellCast": "Cast {spell} from the Ring of Spell Storing.",
@@ -49,6 +56,12 @@
         "Title": "Transfer Ring of Spell Storing",
         "SelectTarget": "Select target actor:",
         "Transfer": "Transfer",
+        "Cancel": "Cancel"
+      },
+      "RemoveSpell": {
+        "Title": "Remove Spell from Ring",
+        "Confirm": "Remove {spell} from the Ring of Spell Storing?",
+        "Remove": "Remove",
         "Cancel": "Cancel"
       }
     },

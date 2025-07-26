@@ -266,20 +266,142 @@
   border-left: 3px solid #8b4513;
 }
 
+/* Ring Spells in Spell List */
+.ring-spells-section {
+  border-top: 2px solid #8b4513;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.ring-spells-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ring-spells-header h3 {
+  margin: 0;
+  color: #8b4513;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ring-spells-header .fas {
+  margin-right: 5px;
+}
+
+.ring-spells-header .capacity-info {
+  margin-left: auto;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.ring-spell-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  margin: 2px 0;
+  background: #f9f9f9;
+  border-radius: 3px;
+  border-left: 3px solid #8b4513;
+  transition: background-color 0.2s ease;
+}
+
+.ring-spell-item:hover {
+  background: #f0f0f0;
+}
+
+.ring-spell-item .spell-level-indicator {
+  width: 24px;
+  height: 24px;
+  background: #8b4513;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.ring-spell-item .spell-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ring-spell-item .spell-name {
+  font-weight: bold;
+  color: #8b4513;
+  margin-bottom: 2px;
+}
+
+.ring-spell-item .spell-caster-info {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.2;
+}
+
+.ring-spell-item .spell-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ring-spell-item .cast-ring-spell,
+.ring-spell-item .remove-ring-spell {
+  border: none;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.ring-spell-item .cast-ring-spell {
+  background: #4caf50;
+  color: white;
+}
+
+.ring-spell-item .cast-ring-spell:hover {
+  background: #45a049;
+}
+
+.ring-spell-item .remove-ring-spell {
+  background: #f44336;
+  color: white;
+}
+
+.ring-spell-item .remove-ring-spell:hover {
+  background: #da190b;
+}
+
 /* Responsive Design */
 @media (max-width: 500px) {
   .ring-of-spell-storing-interface {
     min-width: 300px;
     max-width: 95vw;
   }
-  
+
   .stored-spell-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .spell-actions {
+    align-self: flex-end;
+  }
+
+  .ring-spell-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .ring-spell-item .spell-actions {
     align-self: flex-end;
   }
 }
