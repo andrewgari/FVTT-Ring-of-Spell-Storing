@@ -27,7 +27,7 @@ permissions:
   contents: write
 
 jobs:
-  bump-version:
+  create-release:
     runs-on: ubuntu-latest
     
     steps:
@@ -134,7 +134,47 @@ jobs:
         # Prepend to existing changelog
         cat CHANGELOG.md >> temp_changelog.md
         mv temp_changelog.md CHANGELOG.md
-        
+
+    - name: Create module archive
+      run: |
+        # Create a clean directory structure for the module
+        mkdir -p ring-of-spell-storing
+
+        # Copy all necessary files
+        cp module.json ring-of-spell-storing/
+        cp -r scripts ring-of-spell-storing/
+        cp -r styles ring-of-spell-storing/
+        cp -r templates ring-of-spell-storing/
+        cp -r lang ring-of-spell-storing/
+        cp LICENSE ring-of-spell-storing/
+        cp README.md ring-of-spell-storing/
+        cp CHANGELOG.md ring-of-spell-storing/
+
+        # Create the zip file
+        zip -r ring-of-spell-storing.zip ring-of-spell-storing/
+
+    - name: Generate final changelog for release
+      id: final_changelog
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        # Generate changelog from commits
+        if [ -z "$PREV_TAG" ]; then
+          COMMIT_LOG="Initial release"
+        else
+          COMMIT_LOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD | grep -v "^- Merge" | head -20)
+          if [ -z "$COMMIT_LOG" ]; then
+            COMMIT_LOG="- Minor updates and bug fixes"
+          fi
+        fi
+
+        # Escape newlines for GitHub output
+        COMMIT_LOG="${COMMIT_LOG//'%'/'%25'}"
+        COMMIT_LOG="${COMMIT_LOG//$'\n'/'%0A'}"
+        COMMIT_LOG="${COMMIT_LOG//$'\r'/'%0D'}"
+        echo "CHANGELOG=$COMMIT_LOG" >> $GITHUB_OUTPUT
+
     - name: Commit version bump
       run: |
         git config --local user.email "action@github.com"
@@ -151,41 +191,83 @@ jobs:
         - Updated package.json version
         - Updated CHANGELOG.md with release notes
 
-        This release will be automatically published by GitHub Actions."
+        This release includes automated module packaging."
 
         git commit -m "$COMMIT_MSG"
         git push
 
-    - name: Create and push tag
-      run: |
-        # Create annotated tag with release info
-        TAG_MSG="Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.new_version.outputs.NEW_VERSION }}
+        name: 🎯 Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
+        body: |
+          # 🎯 Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
 
-        Release type: ${{ github.event.inputs.version_type }}
-        Previous version: ${{ steps.current_version.outputs.CURRENT_VERSION }}
+          A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5th Edition in Foundry VTT.
 
-        This tag triggers the automated release workflow."
+          ## 📦 Installation
 
-        git tag -a "v${{ steps.new_version.outputs.NEW_VERSION }}" -m "$TAG_MSG"
-        git push origin "v${{ steps.new_version.outputs.NEW_VERSION }}"
+          **Method 1: Direct Installation (Recommended)**
+          1. In Foundry VTT, go to **Add-on Modules**
+          2. Click **Install Module**
+          3. Paste this manifest URL:
+          ```
+          https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json
+          ```
+          4. Click **Install** and enable the module in your world
+
+          ## ✨ What's New in v${{ steps.new_version.outputs.NEW_VERSION }}
+
+          ${{ github.event.inputs.release_notes && github.event.inputs.release_notes || 'See changes below' }}
+
+          ### 📋 Changes in this Release
+          ${{ steps.final_changelog.outputs.CHANGELOG }}
+
+          ## 🎮 Key Features
+
+          - **Multi-Level Spell Storage**: Store up to 5 levels worth of spells (1st-5th level)
+          - **Any Spellcaster Can Contribute**: Not just the ring owner - any spellcaster can store spells
+          - **Original Caster Statistics**: Spells retain the original caster's attack bonus and save DC
+          - **Intuitive Interface**: Easy-to-use UI for storing, casting, and managing spells
+          - **Ring Transfer Support**: Spells remain when the ring changes hands
+          - **Foundry Integration**: Seamless integration with D&D 5e system
+
+          ## 🔧 Compatibility
+
+          - **Foundry VTT**: v12+
+          - **D&D 5e System**: v3.0.0+
+
+          ## 📚 Documentation
+
+          - [Full Documentation](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/README.md)
+          - [Complete Changelog](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/CHANGELOG.md)
+          - [Report Issues](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/issues)
+        files: ring-of-spell-storing.zip
+        draft: false
+        prerelease: false
 
     - name: Create workflow summary
       run: |
-        echo "## 🎉 Release v${{ steps.new_version.outputs.NEW_VERSION }} Created!" >> $GITHUB_STEP_SUMMARY
+        echo "## 🎉 Release v${{ steps.new_version.outputs.NEW_VERSION }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📊 Release Details" >> $GITHUB_STEP_SUMMARY
         echo "- **Previous Version:** ${{ steps.current_version.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- **New Version:** ${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Release Type:** ${{ github.event.inputs.version_type }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag Created:** v${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Custom Notes:** ${{ github.event.inputs.release_notes || 'None provided' }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚀 What Happens Next" >> $GITHUB_STEP_SUMMARY
-        echo "1. The **Create Release** workflow will be triggered automatically" >> $GITHUB_STEP_SUMMARY
-        echo "2. A GitHub release will be created with proper assets" >> $GITHUB_STEP_SUMMARY
-        echo "3. The module zip file will be built and attached" >> $GITHUB_STEP_SUMMARY
-        echo "4. Release notes will be generated from commits" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Completed Actions" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Version bumped in module.json and package.json" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ CHANGELOG.md updated with release notes" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Module zip file created with proper structure" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ GitHub release created with assets" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Git tag v${{ steps.new_version.outputs.NEW_VERSION }} created" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
-        echo "- [View Actions](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions)" >> $GITHUB_STEP_SUMMARY
-        echo "- [View Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)" >> $GITHUB_STEP_SUMMARY
-        echo "- [View Tag](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/tag/v${{ steps.new_version.outputs.NEW_VERSION }})" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [📋 View Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/tag/v${{ steps.new_version.outputs.NEW_VERSION }})" >> $GITHUB_STEP_SUMMARY
+        echo "- [📦 Download Module](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/download/v${{ steps.new_version.outputs.NEW_VERSION }}/ring-of-spell-storing.zip)" >> $GITHUB_STEP_SUMMARY
+        echo "- [🔗 Manifest URL](https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Ready for Installation!" >> $GITHUB_STEP_SUMMARY
+        echo "The module is now ready for installation in Foundry VTT using the manifest URL above." >> $GITHUB_STEP_SUMMARY
