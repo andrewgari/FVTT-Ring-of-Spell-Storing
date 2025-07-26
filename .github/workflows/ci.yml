@@ -28,20 +28,22 @@ jobs:
 
     - name: Run unit tests
       run: |
-        # Check if Jest is available
-        if npm list jest > /dev/null 2>&1; then
-          echo "🧪 Running unit tests..."
+        # Check if Jest is available in multiple ways
+        if command -v jest >/dev/null 2>&1 || npm list jest >/dev/null 2>&1 || [ -f "node_modules/.bin/jest" ]; then
+          echo "🧪 Jest found, running unit tests..."
           npm run test
         else
           echo "⚠️ Jest not found, skipping unit tests"
           echo "To enable tests, add Jest to devDependencies in package.json"
+          echo "Current dependencies:"
+          npm list --depth=0 || echo "No dependencies found"
         fi
 
     - name: Generate test coverage
       run: |
-        # Check if Jest is available
-        if npm list jest > /dev/null 2>&1; then
-          echo "📊 Generating test coverage..."
+        # Check if Jest is available in multiple ways
+        if command -v jest >/dev/null 2>&1 || npm list jest >/dev/null 2>&1 || [ -f "node_modules/.bin/jest" ]; then
+          echo "📊 Jest found, generating test coverage..."
           npm run test:coverage
         else
           echo "⚠️ Jest not found, skipping coverage generation"
