@@ -114,44 +114,51 @@ export class RingInterface extends Application {
    * Get valid spell slot levels for a spell and actor
    */
   getValidSpellLevels(spell, actor) {
-    const spellLevel = spell.system.level;
+    const spellMinLevel = spell.system.level;
     const spellcasting = actor.system.spells;
     const validLevels = [];
 
-    // Check regular spell slots (levels 1-9)
-    for (let level = Math.max(1, spellLevel); level <= 9; level++) {
+    console.log(`Getting valid levels for ${spell.name} (min level: ${spellMinLevel})`);
+
+    // Check regular spell slots - only levels >= spell's minimum level
+    for (let level = spellMinLevel; level <= 5; level++) { // Ring only stores up to 5th level
       const slotData = spellcasting[`spell${level}`];
-      if (slotData && slotData.max > 0 && level <= 5) { // Ring only stores up to 5th level
+      if (slotData && slotData.max > 0) {
         validLevels.push({
           level: level,
           type: 'spell',
           available: slotData.value || 0,
           max: slotData.max
         });
+        console.log(`Found spell slot level ${level}: ${slotData.value}/${slotData.max} available`);
       }
     }
 
-    // Check pact magic slots (Warlock)
+    // Check pact magic slots (Warlock) - only if pact level >= spell minimum
     if (spellcasting.pact && spellcasting.pact.max > 0) {
       const pactLevel = spellcasting.pact.level;
-      if (pactLevel >= spellLevel && pactLevel <= 5) {
+      if (pactLevel >= spellMinLevel && pactLevel <= 5) {
         validLevels.push({
           level: pactLevel,
           type: 'pact',
           available: spellcasting.pact.value || 0,
           max: spellcasting.pact.max
         });
+        console.log(`Found pact slot level ${pactLevel}: ${spellcasting.pact.value}/${spellcasting.pact.max} available`);
       }
     }
 
     // Generate HTML options
-    return validLevels.map(slot => {
+    const options = validLevels.map(slot => {
       const slotType = slot.type === 'pact' ? ' (Pact)' : '';
       const availability = slot.available > 0 ? ` [${slot.available}/${slot.max} available]` : ' [No slots]';
       return `<option value="${slot.level}" data-type="${slot.type}" ${slot.available === 0 ? 'disabled' : ''}>
         Level ${slot.level}${slotType}${availability}
       </option>`;
     }).join('');
+
+    console.log(`Generated options for ${spell.name}:`, options);
+    return options;
   }
 
   /**
@@ -302,13 +309,19 @@ export class RingInterface extends Application {
    * Store a spell in the ring from a specific actor
    */
   async storeSpellFromActor(spell, casterActor, level, spellType = 'spell') {
+    console.log(`Attempting to store ${spell.name} at level ${level} (min: ${spell.system.level}) from ${casterActor.name}`);
+
     const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const usedLevels = ringData.storedSpells.reduce((sum, s) => sum + s.level, 0);
+
+    console.log(`Current ring data:`, ringData);
+    console.log(`Used levels: ${usedLevels}/${MAX_SPELL_LEVELS}`);
 
     // Validate spell level
     const minLevel = spell.system.level;
     if (level < minLevel) {
       ui.notifications.error(`Cannot cast ${spell.name} at level ${level}. Minimum level is ${minLevel}.`);
+      console.error(`Invalid spell level: ${level} < ${minLevel}`);
       return false;
     }
 
@@ -357,11 +370,15 @@ export class RingInterface extends Application {
     };
 
     ringData.storedSpells.push(spellData);
+    console.log(`Added spell data:`, spellData);
+    console.log(`Updated ring data:`, ringData);
 
     // Update the ring data
     await this.ring.update({
       [`system.flags.${MODULE_ID}`]: ringData
     });
+
+    console.log(`Ring updated successfully`);
 
     ui.notifications.info(
       game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellStored', {
@@ -372,8 +389,8 @@ export class RingInterface extends Application {
     );
 
     // Force a complete re-render of the interface
-    await this.close();
-    new this.constructor(this.actor, this.ring).render(true);
+    console.log(`Forcing interface re-render`);
+    this.render(true);
     return true;
   }
 
@@ -468,8 +485,7 @@ export class RingInterface extends Application {
     );
 
     // Force a complete re-render of the interface
-    await this.close();
-    new this.constructor(this.actor, this.ring).render(true);
+    this.render(true);
     return true;
   }
 
@@ -496,8 +512,7 @@ export class RingInterface extends Application {
     );
 
     // Force a complete re-render of the interface
-    await this.close();
-    new this.constructor(this.actor, this.ring).render(true);
+    this.render(true);
     return true;
   }
 }
