@@ -7,7 +7,7 @@ const MODULE_ID = 'ring-of-spell-storing';
 const MAX_SPELL_LEVELS = 5;
 
 export class RingItem extends CONFIG.Item.documentClass {
-  
+
   /**
    * Get the stored spells data
    */
@@ -91,7 +91,9 @@ export class RingItem extends CONFIG.Item.documentClass {
    */
   async castSpell(spellIndex, caster) {
     const spellData = this.storedSpells[spellIndex];
-    if (!spellData) return false;
+    if (!spellData) {
+      return false;
+    }
 
     // Find the spell
     let spell = caster.items.get(spellData.id);
@@ -111,7 +113,7 @@ export class RingItem extends CONFIG.Item.documentClass {
     // Create a temporary spell item with original caster's stats
     const tempSpellData = foundry.utils.duplicate(spell.toObject());
     tempSpellData.system.preparation = { mode: 'always', prepared: true };
-    
+
     const tempSpell = new CONFIG.Item.documentClass(tempSpellData, { parent: caster });
 
     // Modify the spell roll to use original caster's stats
@@ -147,8 +149,10 @@ export class RingItem extends CONFIG.Item.documentClass {
   async removeSpell(spellIndex) {
     const currentData = this.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const spellData = currentData.storedSpells[spellIndex];
-    
-    if (!spellData) return false;
+
+    if (!spellData) {
+      return false;
+    }
 
     currentData.storedSpells.splice(spellIndex, 1);
     await this.update({
@@ -233,7 +237,7 @@ export class RingItem extends CONFIG.Item.documentClass {
       new RingInterface(this.actor, this).render(true);
       return;
     }
-    
+
     return super.use(config, options);
   }
 
@@ -248,10 +252,10 @@ export class RingItem extends CONFIG.Item.documentClass {
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         content: await this.getChatData()
       };
-      
+
       return ChatMessage.create(chatData);
     }
-    
+
     return super.roll(options);
   }
 

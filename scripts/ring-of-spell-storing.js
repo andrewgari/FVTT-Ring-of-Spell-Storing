@@ -4,7 +4,6 @@
  */
 
 import { RingInterface } from './ring-interface.js';
-import { RingItem } from './ring-item.js';
 
 // Module constants
 const MODULE_ID = 'ring-of-spell-storing';
@@ -16,19 +15,19 @@ const MAX_SPELL_LEVELS = 5;
  */
 class RingOfSpellStoring {
   static ID = MODULE_ID;
-  
+
   static initialize() {
     console.log(`${MODULE_ID} | Initializing Ring of Spell Storing module`);
-    
+
     // Register module settings
     this.registerSettings();
-    
+
     // Register hooks
     this.registerHooks();
-    
+
     // Register socket events for multiplayer support
     this.registerSocketEvents();
-    
+
     // Initialize API
     this.initializeAPI();
   }
@@ -62,16 +61,16 @@ class RingOfSpellStoring {
   static registerHooks() {
     // Hook into ready event
     Hooks.on('ready', this.onReady.bind(this));
-    
+
     // Hook into actor sheet rendering
     Hooks.on('renderActorSheet5eCharacter', this.onRenderActorSheet.bind(this));
-    
+
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
-    
+
     // Hook into spell casting
     Hooks.on('dnd5e.rollSpell', this.onRollSpell.bind(this));
-    
+
     // Hook into item transfer
     Hooks.on('transferItem', this.onTransferItem.bind(this));
   }
@@ -102,7 +101,7 @@ class RingOfSpellStoring {
    */
   static onReady() {
     console.log(`${MODULE_ID} | Module ready`);
-    
+
     // Create custom item type if it doesn't exist
     this.ensureRingItemExists();
   }
@@ -110,12 +109,14 @@ class RingOfSpellStoring {
   /**
    * Handle actor sheet rendering
    */
-  static onRenderActorSheet(sheet, html, data) {
-    if (!game.settings.get(MODULE_ID, 'showInterface')) return;
-    
+  static onRenderActorSheet(sheet, html, _data) {
+    if (!game.settings.get(MODULE_ID, 'showInterface')) {
+      return;
+    }
+
     const actor = sheet.actor;
     const ring = this.findRingOnActor(actor);
-    
+
     if (ring) {
       this.addRingInterfaceButton(html, actor, ring);
     }
@@ -124,7 +125,7 @@ class RingOfSpellStoring {
   /**
    * Handle item usage
    */
-  static onUseItem(item, config, options) {
+  static onUseItem(item, _config, _options) {
     if (item.name === RING_ITEM_NAME) {
       // Open ring interface when the ring is used
       this.openRingInterface(item.actor, item);
@@ -163,15 +164,15 @@ class RingOfSpellStoring {
    */
   static handleSocketEvent(data) {
     switch (data.type) {
-      case 'storeSpell':
-        this.handleStoreSpellSocket(data);
-        break;
-      case 'castSpell':
-        this.handleCastSpellSocket(data);
-        break;
-      case 'removeSpell':
-        this.handleRemoveSpellSocket(data);
-        break;
+    case 'storeSpell':
+      this.handleStoreSpellSocket(data);
+      break;
+    case 'castSpell':
+      this.handleCastSpellSocket(data);
+      break;
+    case 'removeSpell':
+      this.handleRemoveSpellSocket(data);
+      break;
     }
   }
 
@@ -179,8 +180,8 @@ class RingOfSpellStoring {
    * Find Ring of Spell Storing on an actor
    */
   static findRingOnActor(actor) {
-    return actor.items.find(item => 
-      item.name === RING_ITEM_NAME && 
+    return actor.items.find(item =>
+      item.name === RING_ITEM_NAME &&
       item.type === 'equipment' &&
       item.system.equipped
     );
@@ -200,7 +201,9 @@ class RingOfSpellStoring {
    */
   static addRingInterfaceButton(html, actor, ring) {
     const inventoryTab = html.find('.tab[data-tab="inventory"]');
-    if (inventoryTab.length === 0) return;
+    if (inventoryTab.length === 0) {
+      return;
+    }
 
     const button = $(`
       <button type="button" class="ring-interface-btn" style="margin: 5px;">
@@ -227,7 +230,7 @@ class RingOfSpellStoring {
    */
   static async storeSpellInRing(actor, ring, spell, level, originalCaster) {
     const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
-    
+
     // Check capacity
     const usedLevels = ringData.storedSpells.reduce((sum, s) => sum + s.level, 0);
     if (usedLevels + level > MAX_SPELL_LEVELS) {
@@ -276,11 +279,13 @@ class RingOfSpellStoring {
   static async castSpellFromRing(actor, ring, spellIndex) {
     const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const spellData = ringData.storedSpells[spellIndex];
-    
-    if (!spellData) return false;
+
+    if (!spellData) {
+      return false;
+    }
 
     // Find the original spell item
-    const spell = game.items.get(spellData.id) || 
+    const spell = game.items.get(spellData.id) ||
                  actor.items.get(spellData.id) ||
                  await fromUuid(`Compendium.dnd5e.spells.${spellData.id}`);
 
@@ -318,8 +323,10 @@ class RingOfSpellStoring {
   static async removeSpellFromRing(actor, ring, spellIndex) {
     const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const spellData = ringData.storedSpells[spellIndex];
-    
-    if (!spellData) return false;
+
+    if (!spellData) {
+      return false;
+    }
 
     ringData.storedSpells.splice(spellIndex, 1);
     await ring.update({
@@ -338,7 +345,7 @@ class RingOfSpellStoring {
   /**
    * Transfer ring between actors
    */
-  static async transferRing(fromActor, toActor, ring) {
+  static async transferRing(_fromActor, _toActor, _ring) {
     // The ring retains its stored spells when transferred
     // This is handled by the default item transfer system
     return true;

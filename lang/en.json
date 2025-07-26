@@ -17,7 +17,7 @@
       "Close": "Close"
     },
     "Notifications": {
-      "SpellStored": "Spell {spell} stored in the Ring of Spell Storing.",
+      "SpellStored": "Spell {spell} (Level {level}) stored in the Ring of Spell Storing by {caster}.",
       "SpellCast": "Cast {spell} from the Ring of Spell Storing.",
       "SpellRemoved": "Removed {spell} from the Ring of Spell Storing.",
       "InsufficientCapacity": "Insufficient capacity in the ring. Need {required} levels, but only {available} available.",
@@ -26,6 +26,10 @@
       "CannotStoreSpell": "Cannot store this spell in the ring.",
       "RingTransferred": "Ring of Spell Storing transferred to {actor}.",
       "InvalidSpellLevel": "Invalid spell level. Must be between 1 and 5."
+    },
+    "Warnings": {
+      "NoSpellsAvailable": "No valid spells available to store.",
+      "NoSpellcastersAvailable": "No spellcasters available to store spells."
     },
     "Dialogs": {
       "StoreSpell": {

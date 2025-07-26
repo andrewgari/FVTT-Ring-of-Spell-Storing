@@ -1,0 +1,26 @@
+{
+  "name": "ring-of-spell-storing",
+  "version": "0.0.1",
+  "description": "A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5th Edition in Foundry VTT",
+  "main": "scripts/ring-of-spell-storing.js",
+  "scripts": {
+    "lint": "eslint scripts/**/*.js",
+    "lint:fix": "eslint scripts/**/*.js --fix",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "foundry-vtt",
+    "dnd5e",
+    "magic-item",
+    "spell-storing"
+  ],
+  "author": "Andrew Gari",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing.git"
+  }
+}

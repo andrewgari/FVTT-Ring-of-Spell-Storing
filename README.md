@@ -38,6 +38,31 @@ A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5
 4. Click **Install**
 5. Enable the module in your world
 
+## Development
+
+### Setting Up Development Environment
+1. Clone the repository
+2. Run the setup script:
+   ```bash
+   ./setup-dev.sh
+   ```
+   This will:
+   - Install ESLint and dependencies
+   - Set up git hooks for automatic linting
+   - Run an initial lint check
+
+### Available Commands
+- `npm run lint` - Check for linting issues
+- `npm run lint:fix` - Auto-fix linting issues
+
+### Git Hooks
+The repository includes a pre-commit hook that automatically runs ESLint on JavaScript files before each commit. This ensures code quality and consistency.
+
+To bypass the hook (not recommended):
+```bash
+git commit --no-verify
+```
+
 ### Method 2: Manual Installation
 1. Download the latest release from [GitHub Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)
 2. Extract the zip file to your `Data/modules/` directory

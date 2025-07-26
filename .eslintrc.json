@@ -1,0 +1,58 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "globals": {
+    "game": "readonly",
+    "ui": "readonly",
+    "canvas": "readonly",
+    "CONFIG": "readonly",
+    "CONST": "readonly",
+    "foundry": "readonly",
+    "Hooks": "readonly",
+    "Application": "readonly",
+    "Dialog": "readonly",
+    "FormApplication": "readonly",
+    "Actor": "readonly",
+    "Item": "readonly",
+    "Roll": "readonly",
+    "ChatMessage": "readonly",
+    "$": "readonly",
+    "jQuery": "readonly",
+    "Handlebars": "readonly",
+    "renderTemplate": "readonly",
+    "fromUuid": "readonly"
+  },
+  "rules": {
+    "indent": ["error", 2],
+    "linebreak-style": ["error", "unix"],
+    "quotes": ["error", "single", { "allowTemplateLiterals": true }],
+    "semi": ["error", "always"],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "no-debugger": "error",
+    "no-alert": "error",
+    "prefer-const": "warn",
+    "no-var": "error",
+    "eqeqeq": "error",
+    "curly": "error",
+    "brace-style": ["error", "1tbs"],
+    "comma-dangle": ["error", "never"],
+    "object-curly-spacing": ["error", "always"],
+    "array-bracket-spacing": ["error", "never"],
+    "space-before-function-paren": ["error", "never"],
+    "keyword-spacing": ["error", { "before": true, "after": true }],
+    "space-infix-ops": "error",
+    "no-trailing-spaces": "error",
+    "eol-last": "error"
+  }
+}
