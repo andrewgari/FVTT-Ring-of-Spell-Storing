@@ -8,6 +8,9 @@ on:
       - 'CHANGELOG.md'
       - '.github/**'
       - 'docs/**'
+  pull_request:
+    types: [ closed ]
+    branches: [ main ]
 
 permissions:
   contents: write
@@ -15,11 +18,35 @@ permissions:
 jobs:
   auto-release:
     runs-on: ubuntu-latest
-    
-    # Skip if commit message contains [skip-release] or [no-release]
-    if: "!contains(github.event.head_commit.message, '[skip-release]') && !contains(github.event.head_commit.message, '[no-release]')"
+
+    # Only run on direct pushes to main OR merged PRs to main
+    # Skip if commit/PR contains [skip-release] or [no-release]
+    if: |
+      (github.event_name == 'push') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    # Additional skip conditions for commit messages and PR titles
+    env:
+      SKIP_RELEASE: |
+        ${{
+          contains(github.event.head_commit.message, '[skip-release]') ||
+          contains(github.event.head_commit.message, '[no-release]') ||
+          contains(github.event.pull_request.title, '[skip-release]') ||
+          contains(github.event.pull_request.title, '[no-release]') ||
+          contains(github.event.pull_request.body, '[skip-release]') ||
+          contains(github.event.pull_request.body, '[no-release]')
+        }}
     
     steps:
+    - name: Check skip conditions
+      run: |
+        if [ "${{ env.SKIP_RELEASE }}" = "true" ]; then
+          echo "Release skipped due to [skip-release] or [no-release] in commit message or PR"
+          exit 78  # Neutral exit code to skip workflow
+        fi
+
+        echo "Release conditions met, proceeding..."
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -69,21 +96,46 @@ jobs:
       run: |
         # Get commits since last tag
         LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        
+
         if [ -z "$LAST_TAG" ]; then
           COMMIT_LOG="Initial release"
         else
-          COMMIT_LOG=$(git log --pretty=format:"- %s" ${LAST_TAG}..HEAD | grep -v "^- Merge" | head -10)
-          if [ -z "$COMMIT_LOG" ]; then
-            COMMIT_LOG="- Minor updates and improvements"
+          # Different approach for PR merges vs direct pushes
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PR merges, use PR title and description
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_BODY="${{ github.event.pull_request.body }}"
+
+            COMMIT_LOG="- ${PR_TITLE}"
+
+            # Add PR body if it contains useful info (not just template text)
+            if [ -n "$PR_BODY" ] && [ ${#PR_BODY} -gt 50 ]; then
+              # Extract first few lines of PR body as additional context
+              PR_SUMMARY=$(echo "$PR_BODY" | head -3 | sed 's/^/  /')
+              COMMIT_LOG="${COMMIT_LOG}%0A${PR_SUMMARY}"
+            fi
+          else
+            # For direct pushes, use commit messages
+            COMMIT_LOG=$(git log --pretty=format:"- %s" ${LAST_TAG}..HEAD | grep -v "^- Merge" | head -10)
+            if [ -z "$COMMIT_LOG" ]; then
+              COMMIT_LOG="- Minor updates and improvements"
+            fi
           fi
         fi
-        
+
         # Escape for GitHub output
         COMMIT_LOG="${COMMIT_LOG//'%'/'%25'}"
         COMMIT_LOG="${COMMIT_LOG//$'\n'/'%0A'}"
         COMMIT_LOG="${COMMIT_LOG//$'\r'/'%0D'}"
         echo "CHANGELOG=$COMMIT_LOG" >> $GITHUB_OUTPUT
+
+        # Log what we're using for debugging
+        echo "Event type: ${{ github.event_name }}"
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Merged: ${{ github.event.pull_request.merged }}"
+        fi
+        echo "Generated changelog: $COMMIT_LOG"
         
     - name: Update CHANGELOG.md
       run: |
@@ -117,17 +169,24 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add module.json package.json CHANGELOG.md
-        
+
+        # Determine trigger type for commit message
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          TRIGGER="PR merge (#${{ github.event.pull_request.number }})"
+        else
+          TRIGGER="direct push to main"
+        fi
+
         COMMIT_MSG="🔖 Auto-release v${{ steps.new_version.outputs.NEW_VERSION }}
 
-        Automated patch release triggered by push to main.
-        
+        Automated patch release triggered by ${TRIGGER}.
+
         Previous version: ${{ steps.current_version.outputs.CURRENT_VERSION }}
         New version: ${{ steps.new_version.outputs.NEW_VERSION }}
-        
+
         Changes in this release:
         ${{ steps.changelog.outputs.CHANGELOG }}"
-        
+
         git commit -m "$COMMIT_MSG"
         git push
         
@@ -138,8 +197,8 @@ jobs:
         name: v${{ steps.new_version.outputs.NEW_VERSION }}
         body: |
           # Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
-          
-          **Automated release** triggered by push to main branch.
+
+          **Automated release** triggered by ${{ github.event_name == 'pull_request' && format('PR merge (#{0})', github.event.pull_request.number) || 'direct push to main branch' }}.
 
           ## 📦 Installation
           
@@ -173,7 +232,11 @@ jobs:
         echo "## 🎉 Auto-Release v${{ steps.new_version.outputs.NEW_VERSION }} Created!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📊 Release Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Trigger**: Push to main branch" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "- **Trigger**: PR merge (#${{ github.event.pull_request.number }})" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Trigger**: Direct push to main branch" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "- **Previous Version**: ${{ steps.current_version.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- **New Version**: ${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Release Type**: Automated patch release" >> $GITHUB_STEP_SUMMARY
