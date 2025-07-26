@@ -1,3 +1,8 @@
+## [1.0.15] - 2025-07-26
+
+### Changes
+- Restore CHANGELOG.md and update .gitignore%0A- Remove unnecessary markdown files from repository%0A- Fix Ring of Spell Storing UI rendering issues
+
 ## [1.0.14] - 2025-07-26
 
 ### Changes
