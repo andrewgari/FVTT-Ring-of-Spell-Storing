@@ -26,13 +26,22 @@ export class RingInterface extends Application {
   }
 
   getData() {
+    console.log(`=== RingInterface.getData() called ===`);
+    console.log(`Ring ID: ${this.ring.id}`);
+    console.log(`Ring flags:`, this.ring.system.flags);
+
     const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const storedSpells = ringData.storedSpells || [];
+
+    console.log(`Ring data from flags:`, ringData);
+    console.log(`Stored spells array:`, storedSpells);
+    console.log(`Number of stored spells: ${storedSpells.length}`);
+
     const usedLevels = storedSpells.reduce((sum, spell) => sum + spell.level, 0);
     const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
     const capacityPercentage = (usedLevels / MAX_SPELL_LEVELS) * 100;
 
-    return {
+    const templateData = {
       actor: this.actor,
       ring: this.ring,
       storedSpells: storedSpells,
@@ -44,10 +53,32 @@ export class RingInterface extends Application {
       canStore: this.canStoreSpells(),
       canManage: this.canManageRing()
     };
+
+    console.log(`Template data being returned:`, templateData);
+    console.log(`=== End getData() ===`);
+
+    return templateData;
+  }
+
+  async _renderInner(data) {
+    console.log(`=== _renderInner called ===`);
+    console.log(`Data passed to template:`, data);
+    console.log(`Stored spells in render data:`, data.storedSpells);
+
+    const html = await super._renderInner(data);
+
+    console.log(`Rendered HTML length:`, html[0].outerHTML.length);
+    console.log(`Number of .stored-spell-item elements:`, html.find('.stored-spell-item').length);
+    console.log(`=== End _renderInner ===`);
+
+    return html;
   }
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    console.log(`=== activateListeners called ===`);
+    console.log(`Number of .stored-spell-item elements in DOM:`, html.find('.stored-spell-item').length);
 
     // Store spell button
     html.find('[data-action="store"]').click(this._onStoreSpell.bind(this));
@@ -60,6 +91,8 @@ export class RingInterface extends Application {
 
     // Close button
     html.find('[data-action="close"]').click(this._onClose.bind(this));
+
+    console.log(`=== End activateListeners ===`);
   }
 
   /**
@@ -374,11 +407,17 @@ export class RingInterface extends Application {
     console.log(`Updated ring data:`, ringData);
 
     // Update the ring data
-    await this.ring.update({
+    console.log(`About to update ring with data:`, {
       [`system.flags.${MODULE_ID}`]: ringData
     });
 
-    console.log(`Ring updated successfully`);
+    const updateResult = await this.ring.update({
+      [`system.flags.${MODULE_ID}`]: ringData
+    });
+
+    console.log(`Ring update result:`, updateResult);
+    console.log(`Ring flags after update:`, this.ring.system.flags);
+    console.log(`Ring stored spells after update:`, this.ring.system.flags?.[MODULE_ID]?.storedSpells);
 
     ui.notifications.info(
       game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellStored', {
@@ -387,6 +426,11 @@ export class RingInterface extends Application {
         caster: casterActor.name
       })
     );
+
+    // Refresh the ring reference to get the latest data
+    console.log(`Refreshing ring reference...`);
+    this.ring = game.items.get(this.ring.id) || this.actor.items.get(this.ring.id);
+    console.log(`Refreshed ring data:`, this.ring.system.flags?.[MODULE_ID]);
 
     // Force a complete re-render of the interface
     console.log(`Forcing interface re-render`);
