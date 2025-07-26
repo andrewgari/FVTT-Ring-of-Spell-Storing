@@ -122,7 +122,10 @@ class RingOfSpellStoring {
       testUIInjection: this.testUIInjection.bind(this),
       // Diagnostic methods
       runDiagnostics: RingDiagnostics.diagnoseCharacterSheetIntegration.bind(RingDiagnostics),
-      checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics)
+      checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics),
+      // Helper methods for character selection
+      getSelectedActor: this.getSelectedActor.bind(this),
+      testWithSelectedToken: this.testWithSelectedToken.bind(this)
     };
 
     game.modules.get(MODULE_ID).api = api;
@@ -1065,6 +1068,42 @@ class RingOfSpellStoring {
 
     this.addRingInterfaceButton(sheet.element, actor, ring);
     return true;
+  }
+
+  /**
+   * Get the best available actor (selected token > assigned character)
+   */
+  static getSelectedActor() {
+    // Try selected token first (for GMs)
+    const selectedToken = canvas.tokens.controlled[0];
+    if (selectedToken?.actor) {
+      console.log(`${MODULE_ID} | Using selected token: ${selectedToken.actor.name}`);
+      return selectedToken.actor;
+    }
+
+    // Fall back to assigned character
+    const assignedCharacter = game.user.character;
+    if (assignedCharacter) {
+      console.log(`${MODULE_ID} | Using assigned character: ${assignedCharacter.name}`);
+      return assignedCharacter;
+    }
+
+    console.warn(`${MODULE_ID} | No actor available (no selected token or assigned character)`);
+    return null;
+  }
+
+  /**
+   * Test UI injection with selected token (for GM use)
+   */
+  static testWithSelectedToken() {
+    const actor = this.getSelectedActor();
+    if (!actor) {
+      console.error(`${MODULE_ID} | No actor available for testing`);
+      return false;
+    }
+
+    console.log(`${MODULE_ID} | Testing UI injection with: ${actor.name}`);
+    return this.testUIInjection(actor);
   }
 }
 
