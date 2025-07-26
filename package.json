@@ -7,7 +7,12 @@
   "scripts": {
     "lint": "eslint scripts/**/*.js",
     "lint:fix": "eslint scripts/**/*.js --fix",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:verbose": "jest --verbose",
+    "test:persistence": "jest tests/data-persistence.test.js",
+    "test:integration": "jest tests/integration.test.js",
     "release": "./scripts/release.sh",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
@@ -23,7 +28,19 @@
   "author": "Andrew Gari",
   "license": "MIT",
   "devDependencies": {
-    "eslint": "^8.0.0"
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testMatch": ["<rootDir>/tests/**/*.test.js"],
+    "collectCoverageFrom": [
+      "scripts/**/*.js",
+      "!scripts/**/*.test.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"]
   },
   "repository": {
     "type": "git",

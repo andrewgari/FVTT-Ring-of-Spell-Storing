@@ -424,15 +424,22 @@ export class RingInterface extends Application {
       // Try updating the ring directly first
       if (this.ring.parent === this.actor) {
         // Ring is owned by actor, update through actor
-        console.log(`Updating ring through actor...`);
-        updateResult = await this.actor.updateEmbeddedDocuments('Item', [{
+        console.log(`Updating ring through actor (embedded document)...`);
+
+        // For embedded documents, we need to structure the update differently
+        const embeddedUpdateData = {
           _id: this.ring.id,
-          ...updateData
-        }]);
+          [`system.flags.${MODULE_ID}`]: ringData
+        };
+
+        console.log(`Embedded update data:`, embeddedUpdateData);
+        updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
+        console.log(`Embedded update result:`, updateResult);
       } else {
         // Ring is a world item, update directly
-        console.log(`Updating ring directly...`);
+        console.log(`Updating ring directly (world item)...`);
         updateResult = await this.ring.update(updateData);
+        console.log(`Direct update result:`, updateResult);
       }
 
       console.log(`Ring update result:`, updateResult);
