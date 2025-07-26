@@ -1,3 +1,8 @@
+## [1.0.13] - 2025-07-26
+
+### Changes
+- 🔧 Enhance Ring of Spell Storing: Add spell list integration and UI for managing ring spells
+
 ## [1.0.12] - 2025-07-26
 
 ### Changes
