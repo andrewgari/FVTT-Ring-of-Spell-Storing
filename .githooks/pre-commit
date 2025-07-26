@@ -21,15 +21,37 @@ fi
 # Get list of staged JavaScript files
 STAGED_JS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js)$')
 
-if [ -z "$STAGED_JS_FILES" ]; then
-    echo "✅ No JavaScript files to lint."
-    exit 0
+# Debug: Show what files are staged
+echo "🔍 Checking staged files..."
+ALL_STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$ALL_STAGED" ]; then
+    echo "📁 All staged files:"
+    echo "$ALL_STAGED"
+else
+    echo "📁 No staged files detected"
 fi
 
-echo "🔍 Linting JavaScript files..."
-echo "$STAGED_JS_FILES"
+# If no staged JS files found, check if there are any JS files in the scripts directory
+if [ -z "$STAGED_JS_FILES" ]; then
+    echo "⚠️  No staged JavaScript files detected."
 
-# Run ESLint on staged files
+    # Fallback: Check if we have JS files in scripts directory and lint them anyway
+    if [ -d "scripts" ] && [ -n "$(find scripts -name '*.js' 2>/dev/null)" ]; then
+        echo "🔄 Running lint on all JavaScript files in scripts/ directory as fallback..."
+        STAGED_JS_FILES=$(find scripts -name '*.js')
+        echo "📄 Files to lint:"
+        echo "$STAGED_JS_FILES"
+    else
+        echo "✅ No JavaScript files to lint."
+        exit 0
+    fi
+else
+    echo "🔍 Linting staged JavaScript files..."
+    echo "📄 Staged JS files:"
+    echo "$STAGED_JS_FILES"
+fi
+
+# Run ESLint on the files
 npx eslint $STAGED_JS_FILES
 
 ESLINT_EXIT_CODE=$?

@@ -44,35 +44,53 @@ jobs:
           console.log('✅ All required fields present in module.json');
         "
         
+    - name: Validate JavaScript syntax
+      run: |
+        echo "🔍 Checking JavaScript syntax..."
+
+        # Use ESLint to validate syntax without executing files
+        # This is safer than trying to run the files with Node.js
+        for js_file in scripts/*.js; do
+          if [ -f "$js_file" ]; then
+            echo "Checking $js_file..."
+            npx eslint --no-eslintrc --parser-options='{"ecmaVersion": 2022, "sourceType": "module"}' --env browser --no-ignore "$js_file" || {
+              echo "❌ Syntax error in $js_file"
+              exit 1
+            }
+          fi
+        done
+
+        echo "✅ All JavaScript files have valid syntax"
+
     - name: Check file structure
       run: |
         # Check that all referenced files exist
         echo "🔍 Checking file structure..."
-        
+
         # Check scripts
         if [ ! -d "scripts" ]; then
           echo "❌ scripts directory missing"
           exit 1
         fi
-        
+
         # Check styles
         if [ ! -d "styles" ]; then
           echo "❌ styles directory missing"
           exit 1
         fi
-        
+
         # Check templates
         if [ ! -d "templates" ]; then
           echo "❌ templates directory missing"
           exit 1
         fi
-        
+
         # Check language files
         if [ ! -d "lang" ]; then
           echo "❌ lang directory missing"
           exit 1
         fi
-        
+
         echo "✅ File structure is valid"
         
     - name: Check for TODO/FIXME comments
