@@ -111,6 +111,50 @@ export class RingInterface extends Application {
   }
 
   /**
+   * Get valid spell slot levels for a spell and actor
+   */
+  getValidSpellLevels(spell, actor) {
+    const spellLevel = spell.system.level;
+    const spellcasting = actor.system.spells;
+    const validLevels = [];
+
+    // Check regular spell slots (levels 1-9)
+    for (let level = Math.max(1, spellLevel); level <= 9; level++) {
+      const slotData = spellcasting[`spell${level}`];
+      if (slotData && slotData.max > 0 && level <= 5) { // Ring only stores up to 5th level
+        validLevels.push({
+          level: level,
+          type: 'spell',
+          available: slotData.value || 0,
+          max: slotData.max
+        });
+      }
+    }
+
+    // Check pact magic slots (Warlock)
+    if (spellcasting.pact && spellcasting.pact.max > 0) {
+      const pactLevel = spellcasting.pact.level;
+      if (pactLevel >= spellLevel && pactLevel <= 5) {
+        validLevels.push({
+          level: pactLevel,
+          type: 'pact',
+          available: spellcasting.pact.value || 0,
+          max: spellcasting.pact.max
+        });
+      }
+    }
+
+    // Generate HTML options
+    return validLevels.map(slot => {
+      const slotType = slot.type === 'pact' ? ' (Pact)' : '';
+      const availability = slot.available > 0 ? ` [${slot.available}/${slot.max} available]` : ' [No slots]';
+      return `<option value="${slot.level}" data-type="${slot.type}" ${slot.available === 0 ? 'disabled' : ''}>
+        Level ${slot.level}${slotType}${availability}
+      </option>`;
+    }).join('');
+  }
+
+  /**
    * Handle storing a spell in the ring
    */
   async _onStoreSpell(event) {
@@ -148,14 +192,14 @@ export class RingInterface extends Application {
       return;
     }
 
-    // Create spell selection dialog
+    // Create spell selection dialog with dynamic level options
     const spellOptions = allSpells.map((entry, index) =>
-      `<option value="${index}">${entry.displayName}</option>`
+      `<option value="${index}" data-min-level="${entry.spell.system.level}">${entry.displayName}</option>`
     ).join('');
 
-    const levelOptions = Array.from({ length: 5 }, (_, i) => i + 1)
-      .map(level => `<option value="${level}">Level ${level}</option>`)
-      .join('');
+    // Start with first spell's valid levels
+    const firstSpell = allSpells[0];
+    const initialLevelOptions = this.getValidSpellLevels(firstSpell.spell, firstSpell.actor);
 
     const content = `
       <div class="form-group">
@@ -164,12 +208,13 @@ export class RingInterface extends Application {
       </div>
       <div class="form-group">
         <label>${game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.StoreSpell.SelectSlotLevel')}</label>
-        <select id="level-select">${levelOptions}</select>
+        <select id="level-select">${initialLevelOptions}</select>
+        <small class="notes">Choose the spell slot level to use. Higher levels may enhance the spell's effects.</small>
       </div>
     `;
 
     const self = this;
-    new Dialog({
+    const dialog = new Dialog({
       title: game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.StoreSpell.Title'),
       content: content,
       buttons: {
@@ -178,10 +223,11 @@ export class RingInterface extends Application {
           callback: async(html) => {
             const spellIndex = parseInt(html.find('#spell-select').val());
             const level = parseInt(html.find('#level-select').val());
+            const spellType = html.find('#level-select option:selected').data('type');
             const spellEntry = allSpells[spellIndex];
 
             if (spellEntry && level) {
-              await self.storeSpellFromActor(spellEntry.spell, spellEntry.actor, level);
+              await self.storeSpellFromActor(spellEntry.spell, spellEntry.actor, level, spellType);
             }
           }
         },
@@ -189,8 +235,21 @@ export class RingInterface extends Application {
           label: game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.StoreSpell.Cancel')
         }
       },
-      default: 'store'
-    }).render(true);
+      default: 'store',
+      render: (html) => {
+        // Add event listener for spell selection change
+        html.find('#spell-select').on('change', function() {
+          const selectedIndex = parseInt($(this).val());
+          const selectedSpell = allSpells[selectedIndex];
+          if (selectedSpell) {
+            const newLevelOptions = self.getValidSpellLevels(selectedSpell.spell, selectedSpell.actor);
+            html.find('#level-select').html(newLevelOptions);
+          }
+        });
+      }
+    });
+
+    dialog.render(true);
   }
 
   /**
@@ -242,9 +301,21 @@ export class RingInterface extends Application {
   /**
    * Store a spell in the ring from a specific actor
    */
-  async storeSpellFromActor(spell, casterActor, level) {
+  async storeSpellFromActor(spell, casterActor, level, spellType = 'spell') {
     const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const usedLevels = ringData.storedSpells.reduce((sum, s) => sum + s.level, 0);
+
+    // Validate spell level
+    const minLevel = spell.system.level;
+    if (level < minLevel) {
+      ui.notifications.error(`Cannot cast ${spell.name} at level ${level}. Minimum level is ${minLevel}.`);
+      return false;
+    }
+
+    if (level > 5) {
+      ui.notifications.error(`Ring of Spell Storing can only store spells up to 5th level.`);
+      return false;
+    }
 
     if (usedLevels + level > MAX_SPELL_LEVELS) {
       ui.notifications.warn(
@@ -263,10 +334,19 @@ export class RingInterface extends Application {
       return false;
     }
 
+    // Consume the spell slot
+    const consumed = await this.consumeSpellSlot(casterActor, level, spellType);
+    if (!consumed) {
+      ui.notifications.error(`No available ${spellType === 'pact' ? 'pact' : 'spell'} slots of level ${level}.`);
+      return false;
+    }
+
     const spellData = {
       id: spell.id,
       name: spell.name,
       level: level,
+      originalLevel: minLevel,
+      spellType: spellType,
       originalCaster: {
         id: casterActor.id,
         name: casterActor.name,
@@ -278,6 +358,7 @@ export class RingInterface extends Application {
 
     ringData.storedSpells.push(spellData);
 
+    // Update the ring data
     await this.ring.update({
       [`system.flags.${MODULE_ID}`]: ringData
     });
@@ -290,8 +371,42 @@ export class RingInterface extends Application {
       })
     );
 
-    this.render();
+    // Force a complete re-render of the interface
+    await this.close();
+    new this.constructor(this.actor, this.ring).render(true);
     return true;
+  }
+
+  /**
+   * Consume a spell slot from the actor
+   */
+  async consumeSpellSlot(actor, level, spellType) {
+    const spellcasting = actor.system.spells;
+
+    if (spellType === 'pact' && spellcasting.pact) {
+      // Consume pact magic slot
+      if (spellcasting.pact.value > 0) {
+        const newValue = spellcasting.pact.value - 1;
+        await actor.update({
+          'system.spells.pact.value': newValue
+        });
+        return true;
+      }
+      return false;
+    } else {
+      // Consume regular spell slot
+      const slotKey = `spell${level}`;
+      const slotData = spellcasting[slotKey];
+
+      if (slotData && slotData.value > 0) {
+        const newValue = slotData.value - 1;
+        await actor.update({
+          [`system.spells.${slotKey}.value`]: newValue
+        });
+        return true;
+      }
+      return false;
+    }
   }
 
   /**
@@ -352,7 +467,9 @@ export class RingInterface extends Application {
       })
     );
 
-    this.render();
+    // Force a complete re-render of the interface
+    await this.close();
+    new this.constructor(this.actor, this.ring).render(true);
     return true;
   }
 
@@ -378,7 +495,9 @@ export class RingInterface extends Application {
       })
     );
 
-    this.render();
+    // Force a complete re-render of the interface
+    await this.close();
+    new this.constructor(this.actor, this.ring).render(true);
     return true;
   }
 }
