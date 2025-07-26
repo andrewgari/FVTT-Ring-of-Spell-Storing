@@ -1,10 +1,10 @@
-name: Version Bump and Release
+name: 🚀 Create Release
 
 on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Version bump type'
+        description: '📦 Version bump type'
         required: true
         default: 'patch'
         type: choice
@@ -13,9 +13,15 @@ on:
           - minor
           - major
       custom_version:
-        description: 'Custom version (optional, overrides version_type)'
+        description: '🏷️ Custom version (optional, overrides version_type)'
         required: false
         type: string
+        placeholder: 'e.g., 1.2.3'
+      release_notes:
+        description: '📝 Additional release notes (optional)'
+        required: false
+        type: string
+        placeholder: 'Describe the main changes in this release...'
 
 permissions:
   contents: write
@@ -90,25 +96,41 @@ jobs:
         # Update package.json
         sed -i 's/"version": ".*"/"version": "${{ steps.new_version.outputs.NEW_VERSION }}"/' package.json
         
-    - name: Update CHANGELOG.md
+    - name: Generate detailed changelog
+      id: detailed_changelog
       run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        # Generate changelog from commits
+        if [ -z "$PREV_TAG" ]; then
+          COMMIT_LOG="Initial release"
+        else
+          COMMIT_LOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD | grep -v "^- Merge" | head -20)
+          if [ -z "$COMMIT_LOG" ]; then
+            COMMIT_LOG="- Minor updates and bug fixes"
+          fi
+        fi
+
         # Create changelog entry
         DATE=$(date +"%Y-%m-%d")
         NEW_ENTRY="## [${{ steps.new_version.outputs.NEW_VERSION }}] - $DATE"
-        
+
         # Create temporary file with new entry
         echo "$NEW_ENTRY" > temp_changelog.md
         echo "" >> temp_changelog.md
-        echo "### Added" >> temp_changelog.md
-        echo "- New features and improvements" >> temp_changelog.md
+
+        # Add custom release notes if provided
+        if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          echo "### Release Highlights" >> temp_changelog.md
+          echo "${{ github.event.inputs.release_notes }}" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+        fi
+
+        echo "### Changes" >> temp_changelog.md
+        echo "$COMMIT_LOG" >> temp_changelog.md
         echo "" >> temp_changelog.md
-        echo "### Changed" >> temp_changelog.md
-        echo "- Updates and modifications" >> temp_changelog.md
-        echo "" >> temp_changelog.md
-        echo "### Fixed" >> temp_changelog.md
-        echo "- Bug fixes and corrections" >> temp_changelog.md
-        echo "" >> temp_changelog.md
-        
+
         # Prepend to existing changelog
         cat CHANGELOG.md >> temp_changelog.md
         mv temp_changelog.md CHANGELOG.md
@@ -118,16 +140,52 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add module.json package.json CHANGELOG.md
-        git commit -m "Bump version to ${{ steps.new_version.outputs.NEW_VERSION }}"
+
+        # Create detailed commit message
+        COMMIT_MSG="🔖 Release v${{ steps.new_version.outputs.NEW_VERSION }}
+
+        Version bump: ${{ steps.current_version.outputs.CURRENT_VERSION }} → ${{ steps.new_version.outputs.NEW_VERSION }}
+        Release type: ${{ github.event.inputs.version_type }}
+
+        - Updated module.json version
+        - Updated package.json version
+        - Updated CHANGELOG.md with release notes
+
+        This release will be automatically published by GitHub Actions."
+
+        git commit -m "$COMMIT_MSG"
         git push
-        
+
     - name: Create and push tag
       run: |
-        git tag "v${{ steps.new_version.outputs.NEW_VERSION }}"
+        # Create annotated tag with release info
+        TAG_MSG="Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
+
+        Release type: ${{ github.event.inputs.version_type }}
+        Previous version: ${{ steps.current_version.outputs.CURRENT_VERSION }}
+
+        This tag triggers the automated release workflow."
+
+        git tag -a "v${{ steps.new_version.outputs.NEW_VERSION }}" -m "$TAG_MSG"
         git push origin "v${{ steps.new_version.outputs.NEW_VERSION }}"
-        
-    - name: Summary
+
+    - name: Create workflow summary
       run: |
-        echo "✅ Version bumped from ${{ steps.current_version.outputs.CURRENT_VERSION }} to ${{ steps.new_version.outputs.NEW_VERSION }}"
-        echo "🏷️ Tag v${{ steps.new_version.outputs.NEW_VERSION }} created"
-        echo "🚀 Release workflow will be triggered automatically"
+        echo "## 🎉 Release v${{ steps.new_version.outputs.NEW_VERSION }} Created!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Release Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Previous Version:** ${{ steps.current_version.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **New Version:** ${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Release Type:** ${{ github.event.inputs.version_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag Created:** v${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 What Happens Next" >> $GITHUB_STEP_SUMMARY
+        echo "1. The **Create Release** workflow will be triggered automatically" >> $GITHUB_STEP_SUMMARY
+        echo "2. A GitHub release will be created with proper assets" >> $GITHUB_STEP_SUMMARY
+        echo "3. The module zip file will be built and attached" >> $GITHUB_STEP_SUMMARY
+        echo "4. Release notes will be generated from commits" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [View Actions](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- [View Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)" >> $GITHUB_STEP_SUMMARY
+        echo "- [View Tag](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/tag/v${{ steps.new_version.outputs.NEW_VERSION }})" >> $GITHUB_STEP_SUMMARY

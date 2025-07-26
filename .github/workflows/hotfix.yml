@@ -1,0 +1,116 @@
+name: 🚨 Hotfix Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      hotfix_description:
+        description: '🔧 Describe the hotfix'
+        required: true
+        type: string
+        placeholder: 'e.g., Fix critical bug in spell casting'
+
+permissions:
+  contents: write
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(node -p "require('./module.json').version")
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Calculate hotfix version
+      id: hotfix_version
+      run: |
+        CURRENT="${{ steps.current_version.outputs.CURRENT_VERSION }}"
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        # Increment patch version for hotfix
+        PATCH=$((PATCH + 1))
+        HOTFIX_VERSION="$MAJOR.$MINOR.$PATCH"
+        
+        echo "HOTFIX_VERSION=$HOTFIX_VERSION" >> $GITHUB_OUTPUT
+        echo "Hotfix version will be: $HOTFIX_VERSION"
+        
+    - name: Update version in files
+      run: |
+        sed -i 's/"version": ".*"/"version": "${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}"/' module.json
+        sed -i 's/"version": ".*"/"version": "${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}"/' package.json
+        
+    - name: Update CHANGELOG.md
+      run: |
+        DATE=$(date +"%Y-%m-%d")
+        NEW_ENTRY="## [${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}] - $DATE (Hotfix)"
+        
+        echo "$NEW_ENTRY" > temp_changelog.md
+        echo "" >> temp_changelog.md
+        echo "### Fixed" >> temp_changelog.md
+        echo "- ${{ github.event.inputs.hotfix_description }}" >> temp_changelog.md
+        echo "" >> temp_changelog.md
+        
+        cat CHANGELOG.md >> temp_changelog.md
+        mv temp_changelog.md CHANGELOG.md
+        
+    - name: Commit hotfix
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add module.json package.json CHANGELOG.md
+        
+        COMMIT_MSG="🚨 Hotfix v${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}
+
+        ${{ github.event.inputs.hotfix_description }}
+        
+        This is a hotfix release to address critical issues."
+        
+        git commit -m "$COMMIT_MSG"
+        git push
+        
+    - name: Create and push tag
+      run: |
+        TAG_MSG="Ring of Spell Storing v${{ steps.hotfix_version.outputs.HOTFIX_VERSION }} (Hotfix)
+
+        ${{ github.event.inputs.hotfix_description }}
+        
+        This hotfix addresses critical issues and should be deployed immediately."
+        
+        git tag -a "v${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}" -m "$TAG_MSG"
+        git push origin "v${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}"
+        
+    - name: Create workflow summary
+      run: |
+        echo "## 🚨 Hotfix v${{ steps.hotfix_version.outputs.HOTFIX_VERSION }} Created!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Hotfix Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Previous Version:** ${{ steps.current_version.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Hotfix Version:** ${{ steps.hotfix_version.outputs.HOTFIX_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Description:** ${{ github.event.inputs.hotfix_description }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ⚡ Immediate Actions" >> $GITHUB_STEP_SUMMARY
+        echo "- Hotfix tag created and pushed" >> $GITHUB_STEP_SUMMARY
+        echo "- Release workflow triggered automatically" >> $GITHUB_STEP_SUMMARY
+        echo "- Users should update immediately" >> $GITHUB_STEP_SUMMARY

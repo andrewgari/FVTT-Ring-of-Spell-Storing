@@ -1,0 +1,92 @@
+name: 📊 Release Dashboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Get release information
+      id: release_info
+      run: |
+        # Get current version
+        CURRENT_VERSION=$(node -p "require('./module.json').version" 2>/dev/null || echo "0.0.0")
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Get latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+        
+        # Count commits since last tag
+        COMMITS_SINCE_TAG=$(git rev-list ${LATEST_TAG}..HEAD --count 2>/dev/null || echo "0")
+        echo "COMMITS_SINCE_TAG=$COMMITS_SINCE_TAG" >> $GITHUB_OUTPUT
+        
+        # Get last release date
+        LAST_RELEASE_DATE=$(git log -1 --format=%cd --date=short ${LATEST_TAG} 2>/dev/null || echo "Never")
+        echo "LAST_RELEASE_DATE=$LAST_RELEASE_DATE" >> $GITHUB_OUTPUT
+        
+        # Check if release is needed
+        if [ $COMMITS_SINCE_TAG -gt 0 ]; then
+          echo "RELEASE_NEEDED=true" >> $GITHUB_OUTPUT
+        else
+          echo "RELEASE_NEEDED=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Generate release summary
+      id: summary
+      run: |
+        # Get recent commits
+        RECENT_COMMITS=$(git log --oneline -10 --pretty=format:"- %s" | head -10)
+        
+        # Escape for GitHub output
+        RECENT_COMMITS="${RECENT_COMMITS//'%'/'%25'}"
+        RECENT_COMMITS="${RECENT_COMMITS//$'\n'/'%0A'}"
+        RECENT_COMMITS="${RECENT_COMMITS//$'\r'/'%0D'}"
+        echo "RECENT_COMMITS=$RECENT_COMMITS" >> $GITHUB_OUTPUT
+        
+    - name: Create dashboard summary
+      run: |
+        echo "# 📊 Ring of Spell Storing - Release Dashboard" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📈 Current Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Current Version:** ${{ steps.release_info.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Latest Tag:** ${{ steps.release_info.outputs.LATEST_TAG }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Last Release:** ${{ steps.release_info.outputs.LAST_RELEASE_DATE }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commits Since Last Release:** ${{ steps.release_info.outputs.COMMITS_SINCE_TAG }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.release_info.outputs.RELEASE_NEEDED }}" = "true" ]; then
+          echo "## 🚀 Release Recommended" >> $GITHUB_STEP_SUMMARY
+          echo "There are ${{ steps.release_info.outputs.COMMITS_SINCE_TAG }} commits since the last release." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Recent Changes" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.summary.outputs.RECENT_COMMITS }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Quick Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- [Create Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/version-bump.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Create Hotfix](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/hotfix.yml)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ✅ No Release Needed" >> $GITHUB_STEP_SUMMARY
+          echo "The repository is up to date with the latest release." >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [All Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Actions](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Issues](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/issues)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Pull Requests](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/pulls)" >> $GITHUB_STEP_SUMMARY

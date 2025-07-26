@@ -82,19 +82,44 @@ jobs:
       with:
         name: Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
         body: |
-          ## Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
+          # 🎯 Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
 
-          ### Installation
-          Use this manifest URL in Foundry VTT:
+          A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5th Edition in Foundry VTT.
+
+          ## 📦 Installation
+
+          **Method 1: Direct Installation (Recommended)**
+          1. In Foundry VTT, go to **Add-on Modules**
+          2. Click **Install Module**
+          3. Paste this manifest URL:
           ```
           https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json
           ```
+          4. Click **Install** and enable the module in your world
 
-          ### Changes in this Release
+          ## ✨ What's New in v${{ steps.get_version.outputs.VERSION }}
+
           ${{ steps.changelog.outputs.CHANGELOG }}
 
-          ### Full Documentation
-          See [CHANGELOG.md](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/CHANGELOG.md) for complete change history.
+          ## 🎮 Key Features
+
+          - **Multi-Level Spell Storage**: Store up to 5 levels worth of spells (1st-5th level)
+          - **Any Spellcaster Can Contribute**: Not just the ring owner - any spellcaster can store spells
+          - **Original Caster Statistics**: Spells retain the original caster's attack bonus and save DC
+          - **Intuitive Interface**: Easy-to-use UI for storing, casting, and managing spells
+          - **Ring Transfer Support**: Spells remain when the ring changes hands
+          - **Foundry Integration**: Seamless integration with D&D 5e system
+
+          ## 🔧 Compatibility
+
+          - **Foundry VTT**: v12+
+          - **D&D 5e System**: v3.0.0+
+
+          ## 📚 Documentation
+
+          - [Full Documentation](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/README.md)
+          - [Complete Changelog](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/blob/main/CHANGELOG.md)
+          - [Report Issues](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/issues)
         files: ring-of-spell-storing.zip
         draft: false
         prerelease: false

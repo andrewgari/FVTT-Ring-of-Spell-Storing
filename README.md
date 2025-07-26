@@ -68,50 +68,50 @@ To bypass the hook (not recommended):
 git commit --no-verify
 ```
 
-## Automated Release Process
+## 🚀 GitHub-Only Release Process
 
-### Quick Release (Recommended)
-For most updates, simply run:
-```bash
-./quick-release.sh
-```
-This will:
-1. Run linting checks
-2. Bump the patch version (e.g., 0.0.1 → 0.0.2)
-3. Update version in module.json and package.json
-4. Commit and push changes
-5. Create and push a git tag
-6. Trigger automated GitHub Actions release
+**Everything is done through the GitHub web interface - no local commands needed!**
 
-### Manual Release
-For more control over the release type:
-```bash
-# Patch release (bug fixes)
-./scripts/release.sh patch
+### 📦 Standard Release (Recommended)
+1. **Go to**: [Actions → 🚀 Create Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/version-bump.yml)
+2. **Click**: "Run workflow"
+3. **Choose**:
+   - **Version Type**: `patch` (bug fixes), `minor` (new features), or `major` (breaking changes)
+   - **Custom Version**: Optional - override with specific version like `1.2.3`
+   - **Release Notes**: Optional - add custom description of changes
+4. **Click**: "Run workflow"
 
-# Minor release (new features)
-./scripts/release.sh minor
+### 🚨 Hotfix Release
+For critical bug fixes that need immediate release:
+1. **Go to**: [Actions → 🚨 Hotfix Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/hotfix.yml)
+2. **Click**: "Run workflow"
+3. **Describe**: The critical issue being fixed
+4. **Click**: "Run workflow"
 
-# Major release (breaking changes)
-./scripts/release.sh major
-```
+### 📊 Release Dashboard
+Monitor release status and get recommendations:
+1. **Go to**: [Actions → 📊 Release Dashboard](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/release-dashboard.yml)
+2. **Click**: "Run workflow" to see current status
+3. **View**: Commits since last release and release recommendations
 
-### GitHub Actions Release
-You can also create releases directly from GitHub:
-1. Go to **Actions** tab
-2. Select **Version Bump and Release**
-3. Click **Run workflow**
-4. Choose version type or enter custom version
-5. Click **Run workflow**
+### ✨ What Happens Automatically
+When you trigger any release workflow, GitHub Actions will:
+- ✅ **Run linting checks** to ensure code quality
+- ✅ **Calculate new version** based on your selection
+- ✅ **Update version** in module.json and package.json
+- ✅ **Generate changelog** from commit messages
+- ✅ **Create git commit** with version bump
+- ✅ **Create and push git tag** to trigger release
+- ✅ **Build module zip** with proper structure
+- ✅ **Create GitHub release** with detailed notes
+- ✅ **Attach release assets** for easy installation
 
-### What Happens Automatically
-When a release is created, GitHub Actions will:
-- ✅ Run linting checks
-- ✅ Generate changelog from commit messages
-- ✅ Update module.json version
-- ✅ Create properly structured zip file
-- ✅ Create GitHub release with assets
-- ✅ Update release notes automatically
+### 🎯 Quick Links
+- [🚀 Create Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/version-bump.yml)
+- [🚨 Create Hotfix](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/hotfix.yml)
+- [📊 Release Dashboard](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions/workflows/release-dashboard.yml)
+- [📋 All Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)
+- [⚙️ All Actions](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/actions)
 
 ### Method 2: Manual Installation
 1. Download the latest release from [GitHub Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)
