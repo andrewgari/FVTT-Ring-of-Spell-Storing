@@ -41,9 +41,9 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/andrewgari/ring-of-spell-storing",
-  "manifest": "https://raw.githubusercontent.com/andrewgari/ring-of-spell-storing/main/module.json",
-  "download": "https://github.com/andrewgari/ring-of-spell-storing/releases/latest/download/ring-of-spell-storing.zip",
+  "url": "https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing",
+  "manifest": "https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json",
+  "download": "https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/latest/download/ring-of-spell-storing.zip",
   "license": "MIT",
   "readme": "README.md",
   "bugs": "https://github.com/andrewgari/ring-of-spell-storing/issues",

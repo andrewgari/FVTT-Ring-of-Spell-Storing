@@ -34,12 +34,12 @@ A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5
 ### Method 1: Direct Installation (Recommended)
 1. In Foundry VTT, go to the **Add-on Modules** tab
 2. Click **Install Module**
-3. Paste this manifest URL: `https://raw.githubusercontent.com/andrewgari/ring-of-spell-storing/main/module.json`
+3. Paste this manifest URL: `https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json`
 4. Click **Install**
 5. Enable the module in your world
 
 ### Method 2: Manual Installation
-1. Download the latest release from [GitHub Releases](https://github.com/andrewgari/ring-of-spell-storing/releases)
+1. Download the latest release from [GitHub Releases](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases)
 2. Extract the zip file to your `Data/modules/` directory
 3. Restart Foundry VTT
 4. Enable the module in your world
@@ -143,7 +143,7 @@ ringAPI.openRingInterface(actor, ring);
 ### Support
 
 For bug reports and feature requests, please visit:
-[GitHub Issues](https://github.com/andrewgari/ring-of-spell-storing/issues)
+[GitHub Issues](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/issues)
 
 ## License
 

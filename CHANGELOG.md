@@ -70,4 +70,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub repository setup with automated releases
 - GitHub Actions for validation and release management
 - Proper module.json configuration for GitHub installation
+- Repository: https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing
 - MIT License
