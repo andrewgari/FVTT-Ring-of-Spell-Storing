@@ -1,3 +1,8 @@
+## [1.0.11] - 2025-07-26
+
+### Changes
+- 🔧 Add integration and unit tests for Ring of Spell Storing functionality
+
 ## [1.0.10] - 2025-07-26
 
 ### Changes
