@@ -1,3 +1,8 @@
+## [1.0.5] - 2025-07-26
+
+### Changes
+Initial release
+
 ## [1.0.4] - 2025-07-26
 
 ### Changes
