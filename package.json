@@ -12,12 +12,7 @@
     "test:coverage": "jest --coverage",
     "test:verbose": "jest --verbose",
     "test:persistence": "jest tests/data-persistence.test.js",
-    "test:integration": "jest tests/integration.test.js",
-    "release": "./scripts/release.sh",
-    "release:patch": "./scripts/release.sh patch",
-    "release:minor": "./scripts/release.sh minor",
-    "release:major": "./scripts/release.sh major",
-    "quick-release": "./quick-release.sh"
+    "test:integration": "jest tests/integration.test.js"
   },
   "keywords": [
     "foundry-vtt",

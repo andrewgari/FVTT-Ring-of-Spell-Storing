@@ -42,23 +42,20 @@ A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5
 
 ### Setting Up Development Environment
 1. Clone the repository
-2. Run the setup script:
+2. Install dependencies:
    ```bash
-   ./setup-dev.sh
+   npm install
    ```
-   This will:
-   - Install ESLint and dependencies
-   - Set up git hooks for automatic linting
-   - Run an initial lint check
+3. Set up git hooks:
+   ```bash
+   git config core.hooksPath .githooks
+   ```
 
 ### Available Commands
 - `npm run lint` - Check for linting issues
 - `npm run lint:fix` - Auto-fix linting issues
-- `npm run release` - Create a new release (interactive)
-- `npm run release:patch` - Create a patch release (0.0.X)
-- `npm run release:minor` - Create a minor release (0.X.0)
-- `npm run release:major` - Create a major release (X.0.0)
-- `npm run quick-release` - Quick patch release
+- `npm run test` - Run unit tests
+- `npm run test:coverage` - Run tests with coverage report
 
 ### Git Hooks
 The repository includes a pre-commit hook that automatically runs ESLint on JavaScript files before each commit. This ensures code quality and consistency.
