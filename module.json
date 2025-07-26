@@ -28,6 +28,9 @@
   "esmodules": [
     "scripts/ring-of-spell-storing.js"
   ],
+  "scripts": [
+    "scripts/ring-test.js"
+  ],
   "styles": [
     "styles/ring-styles.css"
   ],

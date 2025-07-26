@@ -65,3 +65,9 @@ build/
 # Temporary files
 tmp/
 temp/
+
+# Documentation and scripts (local development only)
+*.md
+!README.md
+!CHANGELOG.md
+*.sh

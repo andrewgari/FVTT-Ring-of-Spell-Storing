@@ -59,13 +59,25 @@ class RingOfSpellStoring {
    * Register Foundry hooks
    */
   static registerHooks() {
+    console.log(`${MODULE_ID} | Registering hooks`);
+
     // Hook into ready event
     Hooks.on('ready', this.onReady.bind(this));
 
     // Hook into actor sheet rendering to add ring spells to spell list
-    Hooks.on('renderActorSheet5eCharacter', this.onRenderActorSheet.bind(this));
-    Hooks.on('renderActorSheet5eCharacter2', this.onRenderActorSheet.bind(this));
-    Hooks.on('renderActorSheet', this.onRenderActorSheet.bind(this));
+    // Register for multiple possible sheet types to ensure compatibility
+    const sheetHooks = [
+      'renderActorSheet',
+      'renderActorSheet5eCharacter',
+      'renderActorSheet5eCharacter2',
+      'renderActorSheet5e',
+      'renderDnd5eActorSheet'
+    ];
+
+    sheetHooks.forEach(hookName => {
+      Hooks.on(hookName, this.onRenderActorSheet.bind(this));
+      console.log(`${MODULE_ID} | Registered hook: ${hookName}`);
+    });
 
     // Hook into actor data preparation to inject ring spells
     Hooks.on('dnd5e.prepareActorData', this.onPrepareActorData.bind(this));
@@ -79,6 +91,8 @@ class RingOfSpellStoring {
 
     // Hook into item transfer
     Hooks.on('transferItem', this.onTransferItem.bind(this));
+
+    console.log(`${MODULE_ID} | All hooks registered successfully`);
   }
 
   /**
@@ -92,7 +106,7 @@ class RingOfSpellStoring {
    * Initialize module API
    */
   static initializeAPI() {
-    game.modules.get(MODULE_ID).api = {
+    const api = {
       findRingOnActor: this.findRingOnActor.bind(this),
       findRingsOnActor: this.findRingsOnActor.bind(this),
       storeSpellInRing: this.storeSpellInRing.bind(this),
@@ -101,8 +115,18 @@ class RingOfSpellStoring {
       transferRing: this.transferRing.bind(this),
       openRingInterface: this.openRingInterface.bind(this),
       castRingSpellFromList: this.castRingSpellFromList.bind(this),
-      debugActorRings: this.debugActorRings.bind(this)
+      debugActorRings: this.debugActorRings.bind(this),
+      debugActorItems: this.debugActorItems.bind(this),
+      forceRenderSheet: this.forceRenderSheet.bind(this),
+      testUIInjection: this.testUIInjection.bind(this)
     };
+
+    game.modules.get(MODULE_ID).api = api;
+
+    // Also make it globally available for console debugging
+    window.RingOfSpellStoringAPI = api;
+
+    console.log(`${MODULE_ID} | API initialized with ${Object.keys(api).length} methods`);
   }
 
   /**
@@ -151,24 +175,38 @@ class RingOfSpellStoring {
    * Handle actor sheet rendering to add ring spell sections
    */
   static onRenderActorSheet(sheet, html, _data) {
-    console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name}`);
+    try {
+      console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name} (sheet type: ${sheet.constructor.name})`);
 
-    // Check if this is a character sheet
-    if (sheet.actor.type !== 'character') {
-      return;
-    }
+      // Check if this is a character sheet
+      if (sheet.actor.type !== 'character') {
+        console.log(`${MODULE_ID} | Skipping non-character actor: ${sheet.actor.type}`);
+        return;
+      }
 
-    // Check module setting
-    const showInterface = game.settings.get(MODULE_ID, 'showInterface');
-    if (!showInterface) {
-      return;
-    }
+      // Check module setting
+      const showInterface = game.settings.get(MODULE_ID, 'showInterface');
+      console.log(`${MODULE_ID} | Show interface setting: ${showInterface}`);
+      if (!showInterface) {
+        console.log(`${MODULE_ID} | Interface disabled in settings`);
+        return;
+      }
 
-    const actor = sheet.actor;
-    const rings = this.findRingsOnActor(actor);
+      const actor = sheet.actor;
+      const rings = this.findRingsOnActor(actor);
+      console.log(`${MODULE_ID} | Found ${rings.length} rings on ${actor.name}`);
 
-    if (rings.length > 0) {
-      this.addAllRingSpellsToSpellList(html, actor, rings);
+      if (rings.length > 0) {
+        console.log(`${MODULE_ID} | Adding ring spells to spell list`);
+        this.addAllRingSpellsToSpellList(html, actor, rings).catch(error => {
+          console.error(`${MODULE_ID} | Error adding ring spells:`, error);
+        });
+      } else {
+        console.log(`${MODULE_ID} | No rings found, checking all items for debugging`);
+        this.debugActorItems(actor);
+      }
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in onRenderActorSheet:`, error);
     }
   }
 
@@ -262,24 +300,31 @@ class RingOfSpellStoring {
    * Find all Rings of Spell Storing on an actor
    */
   static findRingsOnActor(actor) {
+    console.log(`${MODULE_ID} | Searching for rings on ${actor.name}`);
     const rings = [];
 
     // Find all equipped rings that match our criteria
     actor.items.forEach(item => {
+      console.log(`${MODULE_ID} | Checking item: ${item.name} (type: ${item.type}, equipped: ${item.system?.equipped})`);
+
       if (item.type === 'equipment' && item.system.equipped) {
         // Check for exact name match
         if (item.name === RING_ITEM_NAME) {
+          console.log(`${MODULE_ID} | Found exact match: ${item.name}`);
           rings.push(item);
         } else if (item.name.toLowerCase().includes('ring of spell storing')) {
           // Check for case-insensitive partial match
+          console.log(`${MODULE_ID} | Found partial match: ${item.name}`);
           rings.push(item);
         } else if (item.name.toLowerCase().includes('spell storing')) {
           // Check for any ring with spell storing in the name
+          console.log(`${MODULE_ID} | Found spell storing match: ${item.name}`);
           rings.push(item);
         }
       }
     });
 
+    console.log(`${MODULE_ID} | Found ${rings.length} rings total`);
     return rings;
   }
 
@@ -304,29 +349,55 @@ class RingOfSpellStoring {
    * Add all ring spells to the spell list on character sheet
    */
   static async addAllRingSpellsToSpellList(html, actor, rings) {
-    console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name} (${rings.length} rings)`);
+    try {
+      console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name} (${rings.length} rings)`);
 
-    // Find the spells tab
-    const spellsTab = html.find('.tab[data-tab="spells"]');
-    if (spellsTab.length === 0) {
-      console.log(`${MODULE_ID} | Spells tab not found`);
-      return;
-    }
+      // Try multiple possible tab selectors
+      const possibleTabSelectors = [
+        '.tab[data-tab="spells"]',
+        '.tab[data-tab="features"]',
+        '.spells',
+        '.spellbook',
+        '.inventory'
+      ];
 
-    // Remove any existing ring spell sections
-    html.find('.ring-spells-section').remove();
-
-    // Add a section for each ring
-    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
-      const ring = rings[ringIndex];
-      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
-      const storedSpells = ringData.storedSpells || [];
-
-      if (storedSpells.length === 0) {
-        continue; // Skip rings with no spells
+      let spellsTab = null;
+      for (const selector of possibleTabSelectors) {
+        spellsTab = html.find(selector);
+        if (spellsTab.length > 0) {
+          console.log(`${MODULE_ID} | Found target container using selector: ${selector}`);
+          break;
+        }
       }
 
-      await this.addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab);
+      if (!spellsTab || spellsTab.length === 0) {
+        console.log(`${MODULE_ID} | No suitable container found, trying fallback approach`);
+        this.debugSheetStructure(html);
+
+        // Try fallback injection
+        const fallbackSuccess = this.tryFallbackUIInjection(html, actor, rings);
+        if (!fallbackSuccess) {
+          console.warn(`${MODULE_ID} | All UI injection methods failed`);
+        }
+        return;
+      }
+
+      // Remove any existing ring spell sections
+      html.find('.ring-spells-section').remove();
+
+      // Add a section for each ring
+      for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+        const ring = rings[ringIndex];
+        const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+        const storedSpells = ringData.storedSpells || [];
+
+        console.log(`${MODULE_ID} | Ring ${ringIndex + 1}: ${ring.name} has ${storedSpells.length} stored spells`);
+
+        // Always add ring section, even if no spells (for management button)
+        await this.addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab);
+      }
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in addAllRingSpellsToSpellList:`, error);
     }
   }
 
@@ -334,65 +405,74 @@ class RingOfSpellStoring {
    * Add spells from a single ring to the spell list
    */
   static async addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab) {
-    const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
-    const storedSpells = ringData.storedSpells || [];
+    try {
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      const storedSpells = ringData.storedSpells || [];
 
-    // Create unique ring identifier
-    const ringId = ring.id;
-    const usedLevels = storedSpells.reduce((sum, s) => sum + s.level, 0);
+      // Create unique ring identifier
+      const ringId = ring.id;
+      const usedLevels = storedSpells.reduce((sum, s) => sum + s.level, 0);
 
-    // Create ring spells section
-    const ringSpellsSection = $(`
-      <div class="ring-spells-section" data-ring-id="${ringId}" style="margin-top: 10px; border-top: 2px solid #8b4513; padding-top: 10px;">
-        <div class="ring-spells-header" style="display: flex; align-items: center; margin-bottom: 8px;">
-          <h3 style="margin: 0; color: #8b4513; font-size: 14px;">
-            <i class="fas fa-ring" style="margin-right: 5px;"></i>
-            ${ring.name}
-          </h3>
-          <span style="margin-left: auto; font-size: 12px; color: #666;">
-            ${usedLevels}/${MAX_SPELL_LEVELS} levels
-          </span>
-          <button class="manage-ring-btn" data-ring-id="${ringId}"
-                  style="margin-left: 8px; background: #2196f3; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;">
-            <i class="fas fa-cog"></i> Manage
-          </button>
+      console.log(`${MODULE_ID} | Creating ring section for ${ring.name} with ${storedSpells.length} spells`);
+
+      // Create ring spells section with improved styling and visibility
+      const ringSpellsSection = $(`
+        <div class="ring-spells-section" data-ring-id="${ringId}" style="margin: 10px 0; border: 2px solid #8b4513; border-radius: 5px; padding: 10px; background: #f9f9f9;">
+          <div class="ring-spells-header" style="display: flex; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; color: #8b4513; font-size: 16px; font-weight: bold;">
+              <i class="fas fa-ring" style="margin-right: 5px;"></i>
+              ${ring.name}
+            </h3>
+            <span style="margin-left: auto; font-size: 12px; color: #666; font-weight: bold;">
+              ${usedLevels}/${MAX_SPELL_LEVELS} levels
+            </span>
+            <button class="manage-ring-btn" data-ring-id="${ringId}"
+                    style="margin-left: 8px; background: #2196f3; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+              <i class="fas fa-cog"></i> Manage
+            </button>
+          </div>
+          <div class="ring-spells-list" data-ring-id="${ringId}">
+            ${storedSpells.length === 0 ? '<p style="color: #666; font-style: italic; margin: 5px 0;">No spells stored</p>' : ''}
+          </div>
         </div>
-        <div class="ring-spells-list" data-ring-id="${ringId}"></div>
-      </div>
-    `);
+      `);
 
-    // Add individual ring spells
-    const ringSpellsList = ringSpellsSection.find('.ring-spells-list');
+      // Add individual ring spells
+      const ringSpellsList = ringSpellsSection.find('.ring-spells-list');
 
-    for (let i = 0; i < storedSpells.length; i++) {
-      const spellData = storedSpells[i];
-      // Include ring ID and index for proper identification
-      spellData.ringId = ringId;
-      spellData.ringIndex = ringIndex;
-      spellData.spellIndex = i;
+      for (let i = 0; i < storedSpells.length; i++) {
+        const spellData = storedSpells[i];
+        // Include ring ID and index for proper identification
+        spellData.ringId = ringId;
+        spellData.ringIndex = ringIndex;
+        spellData.spellIndex = i;
 
-      const spellItem = await this.createRingSpellItem(actor, spellData, i, ringId);
+        const spellItem = await this.createRingSpellItem(actor, spellData, i, ringId);
 
-      if (spellItem) {
-        const spellElement = await this.createRingSpellElement(spellItem, spellData, ringId);
-        ringSpellsList.append(spellElement);
+        if (spellItem) {
+          const spellElement = await this.createRingSpellElement(spellItem, spellData, ringId);
+          ringSpellsList.append(spellElement);
+        }
       }
+
+      // Add manage button click handler
+      ringSpellsSection.find('.manage-ring-btn').on('click', (event) => {
+        event.preventDefault();
+        const ringId = event.currentTarget.dataset.ringId;
+        const ring = actor.items.get(ringId);
+        if (ring) {
+          console.log(`${MODULE_ID} | Opening ring interface for ${ring.name}`);
+          this.openRingInterface(actor, ring);
+        }
+      });
+
+      // Add the section to the target container
+      spellsTab.append(ringSpellsSection);
+
+      console.log(`${MODULE_ID} | Successfully added ring section for ${ring.name} with ${storedSpells.length} spells`);
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in addSingleRingSpellsToSpellList:`, error);
     }
-
-    // Add manage button click handler
-    ringSpellsSection.find('.manage-ring-btn').on('click', (event) => {
-      event.preventDefault();
-      const ringId = event.currentTarget.dataset.ringId;
-      const ring = actor.items.get(ringId);
-      if (ring) {
-        this.openRingInterface(actor, ring);
-      }
-    });
-
-    // Add the section to the spells tab
-    spellsTab.append(ringSpellsSection);
-
-    console.log(`${MODULE_ID} | Added ${storedSpells.length} spells from ${ring.name}`);
   }
 
   /**
@@ -690,6 +770,182 @@ class RingOfSpellStoring {
     console.log(`${MODULE_ID} | Ring found by findRingOnActor: ${!!foundRing}`);
 
     return foundRing;
+  }
+
+  /**
+   * Debug actor items to help troubleshoot ring detection
+   */
+  static debugActorItems(actor) {
+    console.log(`${MODULE_ID} | Debugging items for ${actor.name}:`);
+    console.log(`${MODULE_ID} | Total items: ${actor.items.size}`);
+
+    const equipment = actor.items.filter(item => item.type === 'equipment');
+    console.log(`${MODULE_ID} | Equipment items: ${equipment.length}`);
+
+    equipment.forEach(item => {
+      console.log(`${MODULE_ID} |   - ${item.name} (equipped: ${item.system.equipped})`);
+    });
+
+    const ringLike = actor.items.filter(item =>
+      item.name.toLowerCase().includes('ring') ||
+      item.name.toLowerCase().includes('spell storing')
+    );
+    console.log(`${MODULE_ID} | Ring-like items: ${ringLike.length}`);
+    ringLike.forEach(item => {
+      console.log(`${MODULE_ID} |   - ${item.name} (type: ${item.type}, equipped: ${item.system.equipped})`);
+    });
+  }
+
+  /**
+   * Debug sheet structure to help troubleshoot UI injection
+   */
+  static debugSheetStructure(html) {
+    console.log(`${MODULE_ID} | Debugging sheet structure:`);
+
+    const tabs = html.find('.tab');
+    console.log(`${MODULE_ID} | Found ${tabs.length} tabs:`);
+    tabs.each((i, tab) => {
+      const $tab = $(tab);
+      console.log(`${MODULE_ID} |   Tab ${i}: data-tab="${$tab.data('tab')}", class="${$tab.attr('class')}"`);
+    });
+
+    const spellElements = html.find('[class*="spell"], [data-tab*="spell"]');
+    console.log(`${MODULE_ID} | Found ${spellElements.length} spell-related elements`);
+
+    // Log the first few elements for inspection
+    spellElements.slice(0, 3).each((i, el) => {
+      const $el = $(el);
+      console.log(`${MODULE_ID} |   Spell element ${i}: class="${$el.attr('class')}", data-tab="${$el.data('tab')}"`);
+    });
+  }
+
+  /**
+   * Try fallback UI injection methods
+   */
+  static tryFallbackUIInjection(html, actor, rings) {
+    console.log(`${MODULE_ID} | Attempting fallback UI injection`);
+
+    // Method 1: Try to inject into the main content area
+    const mainContent = html.find('.sheet-body, .window-content, .tab-content');
+    if (mainContent.length > 0) {
+      console.log(`${MODULE_ID} | Trying injection into main content area`);
+
+      const ringSection = this.createSimpleRingSection(actor, rings);
+      mainContent.first().prepend(ringSection);
+
+      console.log(`${MODULE_ID} | Fallback injection successful`);
+      return true;
+    }
+
+    // Method 2: Try to inject at the very top of the sheet
+    const sheetHeader = html.find('.sheet-header, .window-header');
+    if (sheetHeader.length > 0) {
+      console.log(`${MODULE_ID} | Trying injection after sheet header`);
+
+      const ringSection = this.createSimpleRingSection(actor, rings);
+      sheetHeader.after(ringSection);
+
+      console.log(`${MODULE_ID} | Header fallback injection successful`);
+      return true;
+    }
+
+    // Method 3: Last resort - inject anywhere in the HTML
+    if (html.length > 0) {
+      console.log(`${MODULE_ID} | Last resort injection`);
+
+      const ringSection = this.createSimpleRingSection(actor, rings);
+      html.prepend(ringSection);
+
+      console.log(`${MODULE_ID} | Last resort injection successful`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Create a simple ring section for fallback injection
+   */
+  static createSimpleRingSection(actor, rings) {
+    const ringCount = rings.length;
+    const ringNames = rings.map(r => r.name).join(', ');
+
+    const section = $(`
+      <div class="ring-fallback-section" style="background: #f0f8ff; border: 2px solid #4169e1; border-radius: 5px; padding: 10px; margin: 10px; position: relative; z-index: 1000;">
+        <h3 style="margin: 0 0 10px 0; color: #4169e1;">
+          <i class="fas fa-ring"></i> Ring of Spell Storing (${ringCount} found)
+        </h3>
+        <p style="margin: 5px 0; font-size: 12px; color: #666;">
+          Rings: ${ringNames}
+        </p>
+        <div class="ring-buttons" style="display: flex; gap: 5px; flex-wrap: wrap;">
+        </div>
+      </div>
+    `);
+
+    const buttonContainer = section.find('.ring-buttons');
+
+    rings.forEach((ring, _index) => {
+      const button = $(`
+        <button class="ring-manage-btn" data-ring-id="${ring.id}"
+                style="background: #4169e1; color: white; border: none; border-radius: 3px; padding: 5px 10px; font-size: 11px; cursor: pointer;">
+          <i class="fas fa-cog"></i> Manage ${ring.name}
+        </button>
+      `);
+
+      button.on('click', (event) => {
+        event.preventDefault();
+        console.log(`${MODULE_ID} | Opening ring interface for ${ring.name}`);
+        this.openRingInterface(actor, ring);
+      });
+
+      buttonContainer.append(button);
+    });
+
+    return section;
+  }
+
+  /**
+   * Force render an actor sheet to trigger ring UI
+   */
+  static forceRenderSheet(actor) {
+    console.log(`${MODULE_ID} | Force rendering sheet for ${actor.name}`);
+
+    if (actor.sheet && actor.sheet.rendered) {
+      console.log(`${MODULE_ID} | Re-rendering existing sheet`);
+      actor.sheet.render(false);
+    } else {
+      console.log(`${MODULE_ID} | Opening new sheet`);
+      actor.sheet.render(true);
+    }
+
+    return true;
+  }
+
+  /**
+   * Test UI injection on a specific actor
+   */
+  static testUIInjection(actor) {
+    console.log(`${MODULE_ID} | Testing UI injection for ${actor.name}`);
+
+    const rings = this.findRingsOnActor(actor);
+    console.log(`${MODULE_ID} | Found ${rings.length} rings`);
+
+    if (rings.length === 0) {
+      console.warn(`${MODULE_ID} | No rings found for testing`);
+      return false;
+    }
+
+    const sheet = actor.sheet;
+    if (!sheet || !sheet.rendered) {
+      console.warn(`${MODULE_ID} | Actor sheet not rendered`);
+      return false;
+    }
+
+    const html = sheet.element;
+    this.addAllRingSpellsToSpellList(html, actor, rings);
+
+    return true;
   }
 
   /**
