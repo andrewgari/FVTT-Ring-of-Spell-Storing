@@ -80,7 +80,7 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        name: Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
+        name: v${{ steps.get_version.outputs.VERSION }}
         body: |
           # 🎯 Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
 

@@ -200,7 +200,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.new_version.outputs.NEW_VERSION }}
-        name: 🎯 Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
+        name: v${{ steps.new_version.outputs.NEW_VERSION }}
         body: |
           # 🎯 Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
 

@@ -1,0 +1,191 @@
+name: 🚀 Auto Release on Main
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.github/**'
+      - 'docs/**'
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    
+    # Skip if commit message contains [skip-release] or [no-release]
+    if: "!contains(github.event.head_commit.message, '[skip-release]') && !contains(github.event.head_commit.message, '[no-release]')"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(node -p "require('./module.json').version")
+        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Calculate new patch version
+      id: new_version
+      run: |
+        CURRENT="${{ steps.current_version.outputs.CURRENT_VERSION }}"
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        # Increment patch version
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "Auto-bumping version: $CURRENT → $NEW_VERSION"
+        
+    - name: Update version in files
+      run: |
+        sed -i 's/"version": ".*"/"version": "${{ steps.new_version.outputs.NEW_VERSION }}"/' module.json
+        sed -i 's/"version": ".*"/"version": "${{ steps.new_version.outputs.NEW_VERSION }}"/' package.json
+        
+    - name: Generate changelog from commits
+      id: changelog
+      run: |
+        # Get commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [ -z "$LAST_TAG" ]; then
+          COMMIT_LOG="Initial release"
+        else
+          COMMIT_LOG=$(git log --pretty=format:"- %s" ${LAST_TAG}..HEAD | grep -v "^- Merge" | head -10)
+          if [ -z "$COMMIT_LOG" ]; then
+            COMMIT_LOG="- Minor updates and improvements"
+          fi
+        fi
+        
+        # Escape for GitHub output
+        COMMIT_LOG="${COMMIT_LOG//'%'/'%25'}"
+        COMMIT_LOG="${COMMIT_LOG//$'\n'/'%0A'}"
+        COMMIT_LOG="${COMMIT_LOG//$'\r'/'%0D'}"
+        echo "CHANGELOG=$COMMIT_LOG" >> $GITHUB_OUTPUT
+        
+    - name: Update CHANGELOG.md
+      run: |
+        DATE=$(date +"%Y-%m-%d")
+        NEW_ENTRY="## [${{ steps.new_version.outputs.NEW_VERSION }}] - $DATE"
+        
+        echo "$NEW_ENTRY" > temp_changelog.md
+        echo "" >> temp_changelog.md
+        echo "### Changes" >> temp_changelog.md
+        echo "${{ steps.changelog.outputs.CHANGELOG }}" >> temp_changelog.md
+        echo "" >> temp_changelog.md
+        
+        cat CHANGELOG.md >> temp_changelog.md
+        mv temp_changelog.md CHANGELOG.md
+        
+    - name: Create module archive
+      run: |
+        mkdir -p ring-of-spell-storing
+        cp module.json ring-of-spell-storing/
+        cp -r scripts ring-of-spell-storing/
+        cp -r styles ring-of-spell-storing/
+        cp -r templates ring-of-spell-storing/
+        cp -r lang ring-of-spell-storing/
+        cp LICENSE ring-of-spell-storing/
+        cp README.md ring-of-spell-storing/
+        cp CHANGELOG.md ring-of-spell-storing/
+        zip -r ring-of-spell-storing.zip ring-of-spell-storing/
+        
+    - name: Commit version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add module.json package.json CHANGELOG.md
+        
+        COMMIT_MSG="🔖 Auto-release v${{ steps.new_version.outputs.NEW_VERSION }}
+
+        Automated patch release triggered by push to main.
+        
+        Previous version: ${{ steps.current_version.outputs.CURRENT_VERSION }}
+        New version: ${{ steps.new_version.outputs.NEW_VERSION }}
+        
+        Changes in this release:
+        ${{ steps.changelog.outputs.CHANGELOG }}"
+        
+        git commit -m "$COMMIT_MSG"
+        git push
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.new_version.outputs.NEW_VERSION }}
+        name: v${{ steps.new_version.outputs.NEW_VERSION }}
+        body: |
+          # Ring of Spell Storing v${{ steps.new_version.outputs.NEW_VERSION }}
+          
+          **Automated release** triggered by push to main branch.
+
+          ## 📦 Installation
+          
+          Use this manifest URL in Foundry VTT:
+          ```
+          https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json
+          ```
+
+          ## 🔄 Changes in this Release
+          
+          ${{ steps.changelog.outputs.CHANGELOG }}
+
+          ## 🎮 Features
+          
+          - **Multi-Level Spell Storage**: Store up to 5 levels worth of spells (1st-5th level)
+          - **Any Spellcaster Can Contribute**: Not just the ring owner - any spellcaster can store spells
+          - **Original Caster Statistics**: Spells retain the original caster's attack bonus and save DC
+          - **Intuitive Interface**: Easy-to-use UI for storing, casting, and managing spells
+          - **Ring Transfer Support**: Spells remain when the ring changes hands
+
+          ## 🔧 Compatibility
+          
+          - **Foundry VTT**: v12-v13
+          - **D&D 5e System**: v3.0.0+
+        files: ring-of-spell-storing.zip
+        draft: false
+        prerelease: false
+        
+    - name: Create workflow summary
+      run: |
+        echo "## 🎉 Auto-Release v${{ steps.new_version.outputs.NEW_VERSION }} Created!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Release Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: Push to main branch" >> $GITHUB_STEP_SUMMARY
+        echo "- **Previous Version**: ${{ steps.current_version.outputs.CURRENT_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **New Version**: ${{ steps.new_version.outputs.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Release Type**: Automated patch release" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Completed Actions" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Linting checks passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Version bumped automatically" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ CHANGELOG.md updated" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Module zip created" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ GitHub release published" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [📋 View Release](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/tag/v${{ steps.new_version.outputs.NEW_VERSION }})" >> $GITHUB_STEP_SUMMARY
+        echo "- [📦 Download Module](https://github.com/andrewgari/FVTT-Ring-of-Spell-Storing/releases/download/v${{ steps.new_version.outputs.NEW_VERSION }}/ring-of-spell-storing.zip)" >> $GITHUB_STEP_SUMMARY
+        echo "- [🔗 Manifest URL](https://raw.githubusercontent.com/andrewgari/FVTT-Ring-of-Spell-Storing/main/module.json)" >> $GITHUB_STEP_SUMMARY
