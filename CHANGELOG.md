@@ -1,3 +1,8 @@
+## [1.0.14] - 2025-07-26
+
+### Changes
+- 🔧 Enhance Ring of Spell Storing: Support multiple rings and improve spell management UI
+
 ## [1.0.13] - 2025-07-26
 
 ### Changes
