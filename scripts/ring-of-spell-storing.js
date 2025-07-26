@@ -62,8 +62,10 @@ class RingOfSpellStoring {
     // Hook into ready event
     Hooks.on('ready', this.onReady.bind(this));
 
-    // Hook into actor sheet rendering
+    // Hook into actor sheet rendering - support multiple sheet types
     Hooks.on('renderActorSheet5eCharacter', this.onRenderActorSheet.bind(this));
+    Hooks.on('renderActorSheet5eCharacter2', this.onRenderActorSheet.bind(this));
+    Hooks.on('renderActorSheet', this.onRenderActorSheet.bind(this));
 
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
@@ -92,7 +94,10 @@ class RingOfSpellStoring {
       castSpellFromRing: this.castSpellFromRing.bind(this),
       removeSpellFromRing: this.removeSpellFromRing.bind(this),
       transferRing: this.transferRing.bind(this),
-      openRingInterface: this.openRingInterface.bind(this)
+      openRingInterface: this.openRingInterface.bind(this),
+      addRingInterfaceButton: this.addRingInterfaceButton.bind(this),
+      forceAddButtonToActor: this.forceAddButtonToActor.bind(this),
+      debugActorRings: this.debugActorRings.bind(this)
     };
   }
 
@@ -110,15 +115,33 @@ class RingOfSpellStoring {
    * Handle actor sheet rendering
    */
   static onRenderActorSheet(sheet, html, _data) {
-    if (!game.settings.get(MODULE_ID, 'showInterface')) {
+    console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name}`);
+
+    // Check if this is a character sheet
+    if (sheet.actor.type !== 'character') {
+      console.log(`${MODULE_ID} | Skipping non-character actor: ${sheet.actor.type}`);
+      return;
+    }
+
+    // Check module setting
+    const showInterface = game.settings.get(MODULE_ID, 'showInterface');
+    console.log(`${MODULE_ID} | Show interface setting: ${showInterface}`);
+    if (!showInterface) {
       return;
     }
 
     const actor = sheet.actor;
     const ring = this.findRingOnActor(actor);
 
+    console.log(`${MODULE_ID} | Ring found on ${actor.name}: ${!!ring}`);
     if (ring) {
+      console.log(`${MODULE_ID} | Ring details: ${ring.name}, equipped: ${ring.system.equipped}`);
       this.addRingInterfaceButton(html, actor, ring);
+    } else {
+      // Debug: List all equipment items
+      const equipment = actor.items.filter(item => item.type === 'equipment');
+      console.log(`${MODULE_ID} | Equipment items on ${actor.name}:`,
+        equipment.map(item => `${item.name} (equipped: ${item.system.equipped})`));
     }
   }
 
@@ -180,11 +203,32 @@ class RingOfSpellStoring {
    * Find Ring of Spell Storing on an actor
    */
   static findRingOnActor(actor) {
-    return actor.items.find(item =>
+    // First try exact name match
+    let ring = actor.items.find(item =>
       item.name === RING_ITEM_NAME &&
       item.type === 'equipment' &&
       item.system.equipped
     );
+
+    // If not found, try case-insensitive partial match
+    if (!ring) {
+      ring = actor.items.find(item =>
+        item.name.toLowerCase().includes('ring of spell storing') &&
+        item.type === 'equipment' &&
+        item.system.equipped
+      );
+    }
+
+    // If still not found, try any ring with spell storing in the name
+    if (!ring) {
+      ring = actor.items.find(item =>
+        item.name.toLowerCase().includes('spell storing') &&
+        item.type === 'equipment' &&
+        item.system.equipped
+      );
+    }
+
+    return ring;
   }
 
   /**
@@ -200,22 +244,57 @@ class RingOfSpellStoring {
    * Add ring interface button to character sheet
    */
   static addRingInterfaceButton(html, actor, ring) {
-    const inventoryTab = html.find('.tab[data-tab="inventory"]');
+    console.log(`${MODULE_ID} | Adding ring interface button for ${actor.name}`);
+
+    // Remove any existing buttons first
+    html.find('.ring-interface-btn').remove();
+
+    // Try multiple selectors for the inventory tab
+    let inventoryTab = html.find('.tab[data-tab="inventory"]');
+
     if (inventoryTab.length === 0) {
-      return;
+      // Try alternative selectors
+      inventoryTab = html.find('.inventory');
+      console.log(`${MODULE_ID} | Trying .inventory selector: ${inventoryTab.length} found`);
     }
 
+    if (inventoryTab.length === 0) {
+      inventoryTab = html.find('[data-tab="inventory"]');
+      console.log(`${MODULE_ID} | Trying [data-tab="inventory"] selector: ${inventoryTab.length} found`);
+    }
+
+    if (inventoryTab.length === 0) {
+      // Try to find any tab and log available tabs for debugging
+      const allTabs = html.find('.tab');
+      console.log(`${MODULE_ID} | Available tabs:`, allTabs.map((i, tab) => $(tab).data('tab')).get());
+
+      // Try to add to the first available tab or main content area
+      const mainContent = html.find('.sheet-body, .window-content, .tab').first();
+      if (mainContent.length > 0) {
+        console.log(`${MODULE_ID} | Adding button to main content area`);
+        inventoryTab = mainContent;
+      } else {
+        console.warn(`${MODULE_ID} | Could not find suitable location for ring button`);
+        return;
+      }
+    }
+
+    const buttonText = game.i18n.localize('RING_OF_SPELL_STORING.Interface.Title');
     const button = $(`
-      <button type="button" class="ring-interface-btn" style="margin: 5px;">
-        <i class="fas fa-ring"></i> ${game.i18n.localize('RING_OF_SPELL_STORING.Interface.Title')}
+      <button type="button" class="ring-interface-btn" style="margin: 5px; background: #2196f3; color: white; border: none; border-radius: 4px; padding: 8px 16px; font-size: 13px; cursor: pointer;">
+        <i class="fas fa-ring"></i> ${buttonText}
       </button>
     `);
 
-    button.on('click', () => {
+    button.on('click', (event) => {
+      event.preventDefault();
+      console.log(`${MODULE_ID} | Ring interface button clicked`);
       this.openRingInterface(actor, ring);
     });
 
+    // Add the button to the top of the inventory tab
     inventoryTab.prepend(button);
+    console.log(`${MODULE_ID} | Ring interface button added successfully`);
   }
 
   /**
@@ -348,6 +427,56 @@ class RingOfSpellStoring {
   static async transferRing(_fromActor, _toActor, _ring) {
     // The ring retains its stored spells when transferred
     // This is handled by the default item transfer system
+    return true;
+  }
+
+  /**
+   * Debug function to check rings on an actor
+   */
+  static debugActorRings(actor) {
+    console.log(`${MODULE_ID} | Debugging rings for ${actor.name}:`);
+
+    const allItems = actor.items.contents;
+    console.log(`${MODULE_ID} | Total items: ${allItems.length}`);
+
+    const equipment = allItems.filter(item => item.type === 'equipment');
+    console.log(`${MODULE_ID} | Equipment items: ${equipment.length}`);
+
+    const rings = allItems.filter(item =>
+      item.name.toLowerCase().includes('ring') ||
+      item.name.toLowerCase().includes('spell storing')
+    );
+
+    console.log(`${MODULE_ID} | Ring-like items: ${rings.length}`);
+    rings.forEach(ring => {
+      console.log(`${MODULE_ID} |   - ${ring.name} (type: ${ring.type}, equipped: ${ring.system.equipped})`);
+    });
+
+    const foundRing = this.findRingOnActor(actor);
+    console.log(`${MODULE_ID} | Ring found by findRingOnActor: ${!!foundRing}`);
+
+    return foundRing;
+  }
+
+  /**
+   * Force add button to a specific actor (for debugging)
+   */
+  static forceAddButtonToActor(actor) {
+    console.log(`${MODULE_ID} | Force adding button to ${actor.name}`);
+
+    const ring = this.findRingOnActor(actor);
+    if (!ring) {
+      console.log(`${MODULE_ID} | No ring found on ${actor.name}`);
+      return false;
+    }
+
+    const sheet = actor.sheet;
+    if (!sheet || !sheet.rendered) {
+      console.log(`${MODULE_ID} | Actor sheet not rendered`);
+      return false;
+    }
+
+    this.addRingInterfaceButton(sheet.element, actor, ring);
     return true;
   }
 }
