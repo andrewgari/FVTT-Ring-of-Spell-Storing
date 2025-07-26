@@ -343,6 +343,9 @@ export class RingInterface extends Application {
    */
   async storeSpellFromActor(spell, casterActor, level, spellType = 'spell') {
     console.log(`Attempting to store ${spell.name} at level ${level} (min: ${spell.system.level}) from ${casterActor.name}`);
+    console.log(`MODULE_ID:`, MODULE_ID);
+    console.log(`Ring type:`, this.ring.constructor.name);
+    console.log(`Ring is owned item:`, this.ring.parent === this.actor);
 
     const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const usedLevels = ringData.storedSpells.reduce((sum, s) => sum + s.level, 0);
@@ -406,18 +409,47 @@ export class RingInterface extends Application {
     console.log(`Added spell data:`, spellData);
     console.log(`Updated ring data:`, ringData);
 
-    // Update the ring data
-    console.log(`About to update ring with data:`, {
+    // Update the ring data - fix the update structure
+    const updateData = {
       [`system.flags.${MODULE_ID}`]: ringData
-    });
+    };
 
-    const updateResult = await this.ring.update({
-      [`system.flags.${MODULE_ID}`]: ringData
-    });
+    console.log(`About to update ring with data:`, updateData);
+    console.log(`Ring before update:`, this.ring);
+    console.log(`Ring system before update:`, this.ring.system);
 
-    console.log(`Ring update result:`, updateResult);
-    console.log(`Ring flags after update:`, this.ring.system.flags);
-    console.log(`Ring stored spells after update:`, this.ring.system.flags?.[MODULE_ID]?.storedSpells);
+    try {
+      let updateResult;
+
+      // Try updating the ring directly first
+      if (this.ring.parent === this.actor) {
+        // Ring is owned by actor, update through actor
+        console.log(`Updating ring through actor...`);
+        updateResult = await this.actor.updateEmbeddedDocuments('Item', [{
+          _id: this.ring.id,
+          ...updateData
+        }]);
+      } else {
+        // Ring is a world item, update directly
+        console.log(`Updating ring directly...`);
+        updateResult = await this.ring.update(updateData);
+      }
+
+      console.log(`Ring update result:`, updateResult);
+
+      // Get fresh ring data
+      const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id);
+      console.log(`Fresh ring flags:`, freshRing.system.flags);
+      console.log(`Fresh ring stored spells:`, freshRing.system.flags?.[MODULE_ID]?.storedSpells);
+
+      // Update our reference
+      this.ring = freshRing;
+
+    } catch (error) {
+      console.error(`Ring update failed:`, error);
+      ui.notifications.error(`Failed to store spell: ${error.message}`);
+      return false;
+    }
 
     ui.notifications.info(
       game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellStored', {
@@ -426,11 +458,6 @@ export class RingInterface extends Application {
         caster: casterActor.name
       })
     );
-
-    // Refresh the ring reference to get the latest data
-    console.log(`Refreshing ring reference...`);
-    this.ring = game.items.get(this.ring.id) || this.actor.items.get(this.ring.id);
-    console.log(`Refreshed ring data:`, this.ring.system.flags?.[MODULE_ID]);
 
     // Force a complete re-render of the interface
     console.log(`Forcing interface re-render`);
