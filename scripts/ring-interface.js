@@ -30,21 +30,42 @@ export class RingInterface extends Application {
     console.log(`Ring ID: ${this.ring.id}`);
     console.log(`Ring flags:`, this.ring.system.flags);
 
-    const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+    // Get fresh ring data to ensure we have the latest information
+    const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
+    this.ring = freshRing; // Update our reference
+
+    const ringData = freshRing.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const storedSpells = ringData.storedSpells || [];
 
-    console.log(`Ring data from flags:`, ringData);
+    console.log(`Fresh ring data from flags:`, ringData);
     console.log(`Stored spells array:`, storedSpells);
     console.log(`Number of stored spells: ${storedSpells.length}`);
 
-    const usedLevels = storedSpells.reduce((sum, spell) => sum + spell.level, 0);
+    // Validate stored spells data integrity
+    const validStoredSpells = storedSpells.filter(spell => {
+      if (!spell || typeof spell !== 'object') {
+        console.warn('Invalid spell data found:', spell);
+        return false;
+      }
+      if (!spell.name || !spell.level || !spell.originalCaster) {
+        console.warn('Incomplete spell data found:', spell);
+        return false;
+      }
+      return true;
+    });
+
+    if (validStoredSpells.length !== storedSpells.length) {
+      console.warn(`Filtered out ${storedSpells.length - validStoredSpells.length} invalid spell entries`);
+    }
+
+    const usedLevels = validStoredSpells.reduce((sum, spell) => sum + spell.level, 0);
     const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
     const capacityPercentage = (usedLevels / MAX_SPELL_LEVELS) * 100;
 
     const templateData = {
       actor: this.actor,
-      ring: this.ring,
-      storedSpells: storedSpells,
+      ring: freshRing,
+      storedSpells: validStoredSpells,
       maxLevels: MAX_SPELL_LEVELS,
       usedLevels: usedLevels,
       remainingLevels: remainingLevels,
@@ -55,6 +76,7 @@ export class RingInterface extends Application {
     };
 
     console.log(`Template data being returned:`, templateData);
+    console.log(`Valid stored spells count: ${validStoredSpells.length}`);
     console.log(`=== End getData() ===`);
 
     return templateData;
@@ -144,9 +166,28 @@ export class RingInterface extends Application {
   }
 
   /**
-   * Get valid spell slot levels for a spell and actor
+   * Get valid spell slot levels for a spell and actor (returns HTML options)
    */
   getValidSpellLevels(spell, actor) {
+    const validLevels = this.getValidSpellLevelsArray(spell, actor);
+
+    // Generate HTML options
+    const options = validLevels.map(slot => {
+      const slotType = slot.type === 'pact' ? ' (Pact)' : '';
+      const availability = slot.available > 0 ? ` [${slot.available}/${slot.max} available]` : ' [No slots]';
+      return `<option value="${slot.level}" data-type="${slot.type}" ${slot.available === 0 ? 'disabled' : ''}>
+        Level ${slot.level}${slotType}${availability}
+      </option>`;
+    }).join('');
+
+    console.log(`Generated options for ${spell.name}:`, options);
+    return options;
+  }
+
+  /**
+   * Get valid spell slot levels for a spell and actor (returns array of objects)
+   */
+  getValidSpellLevelsArray(spell, actor) {
     const spellMinLevel = spell.system.level;
     const spellcasting = actor.system.spells;
     const validLevels = [];
@@ -181,17 +222,32 @@ export class RingInterface extends Application {
       }
     }
 
-    // Generate HTML options
-    const options = validLevels.map(slot => {
-      const slotType = slot.type === 'pact' ? ' (Pact)' : '';
-      const availability = slot.available > 0 ? ` [${slot.available}/${slot.max} available]` : ' [No slots]';
-      return `<option value="${slot.level}" data-type="${slot.type}" ${slot.available === 0 ? 'disabled' : ''}>
-        Level ${slot.level}${slotType}${availability}
-      </option>`;
-    }).join('');
+    return validLevels;
+  }
 
-    console.log(`Generated options for ${spell.name}:`, options);
-    return options;
+  /**
+   * Validate spell level selection in the dialog
+   */
+  validateSpellLevelSelection(html, spellEntry) {
+    const selectedLevel = parseInt(html.find('#level-select').val());
+    const minLevel = spellEntry.minLevel;
+    const warningElement = html.find('#validation-warning');
+    const storeButton = html.find('button[data-button="store"]');
+
+    if (selectedLevel && selectedLevel < minLevel) {
+      warningElement.show();
+      warningElement.find('small').text(
+        `⚠️ Invalid selection: ${spellEntry.spell.name} cannot be cast at level ${selectedLevel}. Minimum level is ${minLevel}.`
+      );
+      if (storeButton.length) {
+        storeButton.prop('disabled', true);
+      }
+    } else {
+      warningElement.hide();
+      if (storeButton.length) {
+        storeButton.prop('disabled', false);
+      }
+    }
   }
 
   /**
@@ -210,7 +266,7 @@ export class RingInterface extends Application {
       return;
     }
 
-    // Collect all available spells from all spellcasters
+    // Collect all available spells from all spellcasters with available spell slots
     const allSpells = [];
     spellcasters.forEach(actor => {
       const actorSpells = actor.items.filter(item =>
@@ -218,12 +274,19 @@ export class RingInterface extends Application {
         item.system.level > 0 &&
         item.system.level <= 5
       );
+
       actorSpells.forEach(spell => {
-        allSpells.push({
-          spell: spell,
-          actor: actor,
-          displayName: `${spell.name} (Level ${spell.system.level}) - ${actor.name}`
-        });
+        // Only include spells where the actor has available spell slots at the spell's minimum level or higher
+        const validLevels = this.getValidSpellLevelsArray(spell, actor);
+        if (validLevels.length > 0) {
+          allSpells.push({
+            spell: spell,
+            actor: actor,
+            displayName: `${spell.name} (Level ${spell.system.level}) - ${actor.name}`,
+            minLevel: spell.system.level,
+            validLevels: validLevels
+          });
+        }
       });
     });
 
@@ -232,9 +295,9 @@ export class RingInterface extends Application {
       return;
     }
 
-    // Create spell selection dialog with dynamic level options
+    // Create spell selection dialog with enhanced validation
     const spellOptions = allSpells.map((entry, index) =>
-      `<option value="${index}" data-min-level="${entry.spell.system.level}">${entry.displayName}</option>`
+      `<option value="${index}" data-min-level="${entry.minLevel}">${entry.displayName}</option>`
     ).join('');
 
     // Start with first spell's valid levels
@@ -245,11 +308,19 @@ export class RingInterface extends Application {
       <div class="form-group">
         <label>${game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.StoreSpell.SelectSpell')}</label>
         <select id="spell-select">${spellOptions}</select>
+        <div class="spell-info">
+          <small id="spell-min-level">Minimum spell level: ${firstSpell.minLevel}</small>
+        </div>
       </div>
       <div class="form-group">
         <label>${game.i18n.localize('RING_OF_SPELL_STORING.Dialogs.StoreSpell.SelectSlotLevel')}</label>
         <select id="level-select">${initialLevelOptions}</select>
-        <small class="notes">Choose the spell slot level to use. Higher levels may enhance the spell's effects.</small>
+        <small class="notes">Choose the spell slot level to use. Spells cannot be cast at levels lower than their base level.</small>
+      </div>
+      <div class="form-group">
+        <div class="validation-warning" id="validation-warning" style="color: red; display: none;">
+          <small>⚠️ Invalid selection: This spell cannot be cast at the selected level.</small>
+        </div>
       </div>
     `;
 
@@ -266,8 +337,11 @@ export class RingInterface extends Application {
             const spellType = html.find('#level-select option:selected').data('type');
             const spellEntry = allSpells[spellIndex];
 
-            if (spellEntry && level) {
+            // Final validation before storing
+            if (spellEntry && level && level >= spellEntry.minLevel) {
               await self.storeSpellFromActor(spellEntry.spell, spellEntry.actor, level, spellType);
+            } else {
+              ui.notifications.error(`Cannot store ${spellEntry?.spell.name} at level ${level}. Minimum level is ${spellEntry?.minLevel}.`);
             }
           }
         },
@@ -284,8 +358,22 @@ export class RingInterface extends Application {
           if (selectedSpell) {
             const newLevelOptions = self.getValidSpellLevels(selectedSpell.spell, selectedSpell.actor);
             html.find('#level-select').html(newLevelOptions);
+            html.find('#spell-min-level').text(`Minimum spell level: ${selectedSpell.minLevel}`);
+            self.validateSpellLevelSelection(html, selectedSpell);
           }
         });
+
+        // Add event listener for level selection change
+        html.find('#level-select').on('change', function() {
+          const selectedIndex = parseInt(html.find('#spell-select').val());
+          const selectedSpell = allSpells[selectedIndex];
+          if (selectedSpell) {
+            self.validateSpellLevelSelection(html, selectedSpell);
+          }
+        });
+
+        // Initial validation
+        self.validateSpellLevelSelection(html, firstSpell);
       }
     });
 
@@ -409,24 +497,19 @@ export class RingInterface extends Application {
     console.log(`Added spell data:`, spellData);
     console.log(`Updated ring data:`, ringData);
 
-    // Update the ring data - fix the update structure
-    const updateData = {
-      [`system.flags.${MODULE_ID}`]: ringData
-    };
-
-    console.log(`About to update ring with data:`, updateData);
+    // Update the ring data with improved error handling and validation
+    console.log(`About to update ring with data:`, ringData);
     console.log(`Ring before update:`, this.ring);
     console.log(`Ring system before update:`, this.ring.system);
 
     try {
       let updateResult;
 
-      // Try updating the ring directly first
+      // Determine the correct update method based on ring ownership
       if (this.ring.parent === this.actor) {
-        // Ring is owned by actor, update through actor
+        // Ring is owned by actor, update through actor (embedded document)
         console.log(`Updating ring through actor (embedded document)...`);
 
-        // For embedded documents, we need to structure the update differently
         const embeddedUpdateData = {
           _id: this.ring.id,
           [`system.flags.${MODULE_ID}`]: ringData
@@ -438,16 +521,43 @@ export class RingInterface extends Application {
       } else {
         // Ring is a world item, update directly
         console.log(`Updating ring directly (world item)...`);
+        const updateData = {
+          [`system.flags.${MODULE_ID}`]: ringData
+        };
         updateResult = await this.ring.update(updateData);
         console.log(`Direct update result:`, updateResult);
       }
 
-      console.log(`Ring update result:`, updateResult);
+      // Verify the update was successful
+      if (!updateResult) {
+        throw new Error('Update operation returned null or undefined');
+      }
 
-      // Get fresh ring data
+      // Get fresh ring data and verify the spell was stored
       const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id);
+      if (!freshRing) {
+        throw new Error('Could not retrieve updated ring item');
+      }
+
+      const freshRingData = freshRing.system.flags?.[MODULE_ID];
+      if (!freshRingData || !freshRingData.storedSpells) {
+        throw new Error('Ring data structure is invalid after update');
+      }
+
       console.log(`Fresh ring flags:`, freshRing.system.flags);
-      console.log(`Fresh ring stored spells:`, freshRing.system.flags?.[MODULE_ID]?.storedSpells);
+      console.log(`Fresh ring stored spells:`, freshRingData.storedSpells);
+      console.log(`Fresh ring spell count: ${freshRingData.storedSpells.length}`);
+
+      // Verify our spell was actually added
+      const spellFound = freshRingData.storedSpells.some(s =>
+        s.name === spellData.name &&
+        s.level === spellData.level &&
+        s.originalCaster.id === spellData.originalCaster.id
+      );
+
+      if (!spellFound) {
+        throw new Error('Spell was not found in ring after update - storage may have failed');
+      }
 
       // Update our reference
       this.ring = freshRing;
@@ -455,6 +565,17 @@ export class RingInterface extends Application {
     } catch (error) {
       console.error(`Ring update failed:`, error);
       ui.notifications.error(`Failed to store spell: ${error.message}`);
+
+      // Restore consumed spell slot if update failed
+      if (consumed) {
+        console.log('Attempting to restore consumed spell slot due to update failure...');
+        try {
+          await this.restoreSpellSlot(casterActor, level, spellType);
+        } catch (restoreError) {
+          console.error('Failed to restore spell slot:', restoreError);
+        }
+      }
+
       return false;
     }
 
@@ -485,8 +606,10 @@ export class RingInterface extends Application {
         await actor.update({
           'system.spells.pact.value': newValue
         });
+        console.log(`Consumed pact slot: ${spellcasting.pact.value} -> ${newValue}`);
         return true;
       }
+      console.log(`No pact slots available: ${spellcasting.pact.value}`);
       return false;
     } else {
       // Consume regular spell slot
@@ -498,6 +621,39 @@ export class RingInterface extends Application {
         await actor.update({
           [`system.spells.${slotKey}.value`]: newValue
         });
+        console.log(`Consumed ${slotKey} slot: ${slotData.value} -> ${newValue}`);
+        return true;
+      }
+      console.log(`No ${slotKey} slots available: ${slotData?.value || 0}`);
+      return false;
+    }
+  }
+
+  /**
+   * Restore a spell slot to the actor (used when spell storage fails)
+   */
+  async restoreSpellSlot(actor, level, spellType) {
+    const spellcasting = actor.system.spells;
+
+    if (spellType === 'pact' && spellcasting.pact) {
+      // Restore pact magic slot
+      const newValue = Math.min(spellcasting.pact.value + 1, spellcasting.pact.max);
+      await actor.update({
+        'system.spells.pact.value': newValue
+      });
+      console.log(`Restored pact slot: ${spellcasting.pact.value} -> ${newValue}`);
+      return true;
+    } else {
+      // Restore regular spell slot
+      const slotKey = `spell${level}`;
+      const slotData = spellcasting[slotKey];
+
+      if (slotData) {
+        const newValue = Math.min(slotData.value + 1, slotData.max);
+        await actor.update({
+          [`system.spells.${slotKey}.value`]: newValue
+        });
+        console.log(`Restored ${slotKey} slot: ${slotData.value} -> ${newValue}`);
         return true;
       }
       return false;
@@ -515,12 +671,17 @@ export class RingInterface extends Application {
    * Cast a spell from the ring
    */
   async castSpell(spellIndex) {
-    const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+    // Get fresh ring data
+    const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
+    const ringData = freshRing.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const spellData = ringData.storedSpells[spellIndex];
 
     if (!spellData) {
+      ui.notifications.error('Spell not found in ring.');
       return false;
     }
+
+    console.log(`Casting spell: ${spellData.name} at level ${spellData.level}`);
 
     // Find the spell
     let spell = this.actor.items.get(spellData.id);
@@ -537,60 +698,104 @@ export class RingInterface extends Application {
       return false;
     }
 
-    // Create a temporary spell item with original caster's stats
-    const tempSpellData = foundry.utils.duplicate(spell.toObject());
-    tempSpellData.system.preparation = { mode: 'always', prepared: true };
+    try {
+      // Create a temporary spell item with original caster's stats
+      const tempSpellData = foundry.utils.duplicate(spell.toObject());
+      tempSpellData.system.preparation = { mode: 'always', prepared: true };
 
-    const tempSpell = new CONFIG.Item.documentClass(tempSpellData, { parent: this.actor });
+      const tempSpell = new CONFIG.Item.documentClass(tempSpellData, { parent: this.actor });
 
-    // Cast the spell
-    await tempSpell.roll({
-      spellLevel: spellData.level,
-      consumeSpellSlot: false,
-      configureDialog: true
-    });
+      // Cast the spell
+      await tempSpell.roll({
+        spellLevel: spellData.level,
+        consumeSpellSlot: false,
+        configureDialog: true
+      });
 
-    // Remove spell from ring
-    ringData.storedSpells.splice(spellIndex, 1);
-    await this.ring.update({
-      [`system.flags.${MODULE_ID}`]: ringData
-    });
+      // Remove spell from ring after successful cast
+      ringData.storedSpells.splice(spellIndex, 1);
 
-    ui.notifications.info(
-      game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellCast', {
-        spell: spellData.name
-      })
-    );
+      // Update ring with improved error handling
+      if (freshRing.parent === this.actor) {
+        await this.actor.updateEmbeddedDocuments('Item', [{
+          _id: freshRing.id,
+          [`system.flags.${MODULE_ID}`]: ringData
+        }]);
+      } else {
+        await freshRing.update({
+          [`system.flags.${MODULE_ID}`]: ringData
+        });
+      }
 
-    // Force a complete re-render of the interface
-    this.render(true);
-    return true;
+      // Update our reference
+      this.ring = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || freshRing;
+
+      ui.notifications.info(
+        game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellCast', {
+          spell: spellData.name
+        })
+      );
+
+      // Force a complete re-render of the interface
+      this.render(true);
+      return true;
+
+    } catch (error) {
+      console.error('Failed to cast spell from ring:', error);
+      ui.notifications.error(`Failed to cast spell: ${error.message}`);
+      return false;
+    }
   }
 
   /**
    * Remove a spell from the ring
    */
   async removeSpell(spellIndex) {
-    const ringData = this.ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+    // Get fresh ring data
+    const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
+    const ringData = freshRing.system.flags?.[MODULE_ID] || { storedSpells: [] };
     const spellData = ringData.storedSpells[spellIndex];
 
     if (!spellData) {
+      ui.notifications.error('Spell not found in ring.');
       return false;
     }
 
-    ringData.storedSpells.splice(spellIndex, 1);
-    await this.ring.update({
-      [`system.flags.${MODULE_ID}`]: ringData
-    });
+    console.log(`Removing spell: ${spellData.name} at level ${spellData.level}`);
 
-    ui.notifications.info(
-      game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellRemoved', {
-        spell: spellData.name
-      })
-    );
+    try {
+      // Remove spell from array
+      ringData.storedSpells.splice(spellIndex, 1);
 
-    // Force a complete re-render of the interface
-    this.render(true);
-    return true;
+      // Update ring with improved error handling
+      if (freshRing.parent === this.actor) {
+        await this.actor.updateEmbeddedDocuments('Item', [{
+          _id: freshRing.id,
+          [`system.flags.${MODULE_ID}`]: ringData
+        }]);
+      } else {
+        await freshRing.update({
+          [`system.flags.${MODULE_ID}`]: ringData
+        });
+      }
+
+      // Update our reference
+      this.ring = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || freshRing;
+
+      ui.notifications.info(
+        game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellRemoved', {
+          spell: spellData.name
+        })
+      );
+
+      // Force a complete re-render of the interface
+      this.render(true);
+      return true;
+
+    } catch (error) {
+      console.error('Failed to remove spell from ring:', error);
+      ui.notifications.error(`Failed to remove spell: ${error.message}`);
+      return false;
+    }
   }
 }
