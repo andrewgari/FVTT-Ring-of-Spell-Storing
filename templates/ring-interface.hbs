@@ -1,0 +1,74 @@
+<div class="ring-of-spell-storing-interface">
+  <div class="ring-interface-header">
+    {{localize "RING_OF_SPELL_STORING.Interface.Title"}}
+  </div>
+  
+  <div class="ring-interface-content">
+    <!-- Capacity Display -->
+    <div class="ring-capacity">
+      <div class="capacity-label">
+        {{localize "RING_OF_SPELL_STORING.Interface.Capacity"}}: {{usedLevels}}/{{maxLevels}}
+      </div>
+      <div class="capacity-bar">
+        <div class="capacity-fill" style="width: {{capacityPercentage}}%"></div>
+        <div class="capacity-text">
+          {{localize "RING_OF_SPELL_STORING.Interface.RemainingLevels"}}: {{remainingLevels}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Stored Spells List -->
+    <div class="stored-spells-section">
+      <h3>{{localize "RING_OF_SPELL_STORING.Interface.StoredSpells"}}</h3>
+      <div class="stored-spells-list">
+        {{#if storedSpells.length}}
+          {{#each storedSpells}}
+          <div class="stored-spell-item" data-spell-id="{{@index}}">
+            <div class="spell-icon">{{level}}</div>
+            <div class="spell-details">
+              <div class="spell-name">{{name}}</div>
+              <div class="spell-info">
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.OriginalCaster"}}: {{originalCaster.name}}</div>
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.SpellLevel"}}: {{level}}</div>
+                {{#if originalCaster.spellAttackBonus}}
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.SpellAttackBonus"}}: +{{originalCaster.spellAttackBonus}}</div>
+                {{/if}}
+                {{#if originalCaster.spellSaveDC}}
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.SpellSaveDC"}}: {{originalCaster.spellSaveDC}}</div>
+                {{/if}}
+              </div>
+            </div>
+            <div class="spell-actions">
+              {{#if ../canCast}}
+              <button class="spell-action-btn cast" data-action="cast" data-spell-id="{{@index}}">
+                {{localize "RING_OF_SPELL_STORING.Interface.CastSpell"}}
+              </button>
+              {{/if}}
+              {{#if ../canManage}}
+              <button class="spell-action-btn remove" data-action="remove" data-spell-id="{{@index}}">
+                {{localize "RING_OF_SPELL_STORING.Interface.RemoveSpell"}}
+              </button>
+              {{/if}}
+            </div>
+          </div>
+          {{/each}}
+        {{else}}
+          <div class="no-spells-message">
+            {{localize "RING_OF_SPELL_STORING.Interface.NoSpellsStored"}}
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+
+  <div class="ring-interface-footer">
+    {{#if canStore}}
+    <button class="store-spell-btn" data-action="store">
+      {{localize "RING_OF_SPELL_STORING.Interface.StoreSpell"}}
+    </button>
+    {{/if}}
+    <button class="close-btn" data-action="close">
+      {{localize "RING_OF_SPELL_STORING.Interface.Close"}}
+    </button>
+  </div>
+</div>

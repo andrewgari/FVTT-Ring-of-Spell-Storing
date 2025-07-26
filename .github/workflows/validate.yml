@@ -1,0 +1,94 @@
+name: Validate Module
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Validate module.json
+      run: |
+        echo "Validating module.json..."
+        node -e "
+          const fs = require('fs');
+          try {
+            const manifest = JSON.parse(fs.readFileSync('module.json', 'utf8'));
+            console.log('✓ module.json is valid JSON');
+            
+            // Check required fields
+            const required = ['id', 'title', 'description', 'version', 'compatibility'];
+            for (const field of required) {
+              if (!manifest[field]) {
+                throw new Error(\`Missing required field: \${field}\`);
+              }
+            }
+            console.log('✓ All required fields present');
+            
+            // Check file references
+            const files = [
+              ...(manifest.esmodules || []),
+              ...(manifest.styles || []),
+              ...(manifest.templates || []),
+              ...(manifest.languages || []).map(l => l.path)
+            ];
+            
+            for (const file of files) {
+              if (!fs.existsSync(file)) {
+                throw new Error(\`Referenced file not found: \${file}\`);
+              }
+            }
+            console.log('✓ All referenced files exist');
+            
+            console.log('Module validation passed!');
+          } catch (error) {
+            console.error('❌ Validation failed:', error.message);
+            process.exit(1);
+          }
+        "
+        
+    - name: Check JavaScript syntax
+      run: |
+        echo "Checking JavaScript files..."
+        for file in scripts/*.js; do
+          if [ -f "$file" ]; then
+            echo "Checking $file..."
+            node -c "$file" || exit 1
+          fi
+        done
+        echo "✓ All JavaScript files have valid syntax"
+        
+    - name: Validate templates
+      run: |
+        echo "Checking Handlebars templates..."
+        for file in templates/*.hbs; do
+          if [ -f "$file" ]; then
+            echo "Checking $file..."
+            # Basic template validation - check for balanced braces
+            if ! node -e "
+              const fs = require('fs');
+              const content = fs.readFileSync('$file', 'utf8');
+              const openBraces = (content.match(/{{/g) || []).length;
+              const closeBraces = (content.match(/}}/g) || []).length;
+              if (openBraces !== closeBraces) {
+                throw new Error('Unbalanced handlebars braces');
+              }
+            "; then
+              echo "❌ Template validation failed for $file"
+              exit 1
+            fi
+          fi
+        done
+        echo "✓ All templates are valid"

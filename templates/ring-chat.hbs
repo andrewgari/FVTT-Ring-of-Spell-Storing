@@ -1,0 +1,44 @@
+<div class="dnd5e chat-card item-card">
+  <header class="card-header flexrow">
+    <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
+    <h3 class="item-name">{{item.name}}</h3>
+  </header>
+
+  <div class="card-content">
+    <div class="ring-capacity-display">
+      <h4>{{localize "RING_OF_SPELL_STORING.Interface.Capacity"}}</h4>
+      <p><strong>{{usedLevels}}/{{maxLevels}}</strong> spell levels used</p>
+      <p><strong>{{remainingLevels}}</strong> levels remaining</p>
+    </div>
+
+    {{#if storedSpells.length}}
+    <div class="stored-spells-display">
+      <h4>{{localize "RING_OF_SPELL_STORING.Interface.StoredSpells"}}</h4>
+      <ul>
+        {{#each storedSpells}}
+        <li>
+          <strong>{{name}}</strong> (Level {{level}})
+          <br><small>Stored by {{originalCaster.name}} on {{storedDate}}</small>
+          {{#if originalCaster.spellAttackBonus}}
+          <br><small>Attack Bonus: +{{originalCaster.spellAttackBonus}}</small>
+          {{/if}}
+          {{#if originalCaster.spellSaveDC}}
+          <br><small>Save DC: {{originalCaster.spellSaveDC}}</small>
+          {{/if}}
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+    {{else}}
+    <p><em>{{localize "RING_OF_SPELL_STORING.Interface.NoSpellsStored"}}</em></p>
+    {{/if}}
+
+    <div class="item-description">
+      <p>This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time. When found, it contains 1d6 − 1 levels of stored spells chosen by the GM.</p>
+      
+      <p>Any creature can cast a spell of 1st through 5th level into the ring by touching the ring as the spell is cast. The spell has no effect, other than to be stored in the ring. If the ring can't hold the spell, the spell is expended without effect. The level of the slot used to cast the spell determines how much space it uses.</p>
+      
+      <p>While wearing this ring, you can cast any spell stored in it. The spell uses the slot level, spell save DC, spell attack bonus, and spellcasting ability of the original caster, but is otherwise treated as if you cast the spell. The spell cast from the ring is no longer stored in it, freeing up space.</p>
+    </div>
+  </div>
+</div>

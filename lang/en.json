@@ -1,0 +1,62 @@
+{
+  "RING_OF_SPELL_STORING": {
+    "Title": "Ring of Spell Storing",
+    "Interface": {
+      "Title": "Ring of Spell Storing Interface",
+      "StoredSpells": "Stored Spells",
+      "Capacity": "Capacity",
+      "RemainingLevels": "Remaining Levels",
+      "NoSpellsStored": "No spells currently stored in the ring.",
+      "StoreSpell": "Store Spell",
+      "CastSpell": "Cast Spell",
+      "RemoveSpell": "Remove Spell",
+      "OriginalCaster": "Original Caster",
+      "SpellLevel": "Spell Level",
+      "SpellAttackBonus": "Spell Attack Bonus",
+      "SpellSaveDC": "Spell Save DC",
+      "Close": "Close"
+    },
+    "Notifications": {
+      "SpellStored": "Spell {spell} stored in the Ring of Spell Storing.",
+      "SpellCast": "Cast {spell} from the Ring of Spell Storing.",
+      "SpellRemoved": "Removed {spell} from the Ring of Spell Storing.",
+      "InsufficientCapacity": "Insufficient capacity in the ring. Need {required} levels, but only {available} available.",
+      "NoRingFound": "No Ring of Spell Storing found in inventory.",
+      "NotOwner": "You must own the Ring of Spell Storing to cast spells from it.",
+      "CannotStoreSpell": "Cannot store this spell in the ring.",
+      "RingTransferred": "Ring of Spell Storing transferred to {actor}.",
+      "InvalidSpellLevel": "Invalid spell level. Must be between 1 and 5."
+    },
+    "Dialogs": {
+      "StoreSpell": {
+        "Title": "Store Spell in Ring",
+        "SelectSpell": "Select a spell to store:",
+        "SelectSlotLevel": "Select spell slot level:",
+        "Store": "Store",
+        "Cancel": "Cancel"
+      },
+      "CastSpell": {
+        "Title": "Cast Spell from Ring",
+        "Confirm": "Cast {spell} using {caster}'s statistics?",
+        "Cast": "Cast",
+        "Cancel": "Cancel"
+      },
+      "TransferRing": {
+        "Title": "Transfer Ring of Spell Storing",
+        "SelectTarget": "Select target actor:",
+        "Transfer": "Transfer",
+        "Cancel": "Cancel"
+      }
+    },
+    "Settings": {
+      "ShowInterface": {
+        "Name": "Show Ring Interface",
+        "Hint": "Display the Ring of Spell Storing interface when a character has the ring equipped."
+      },
+      "AllowSelfSpells": {
+        "Name": "Allow Self-Targeting Spells",
+        "Hint": "Allow storing spells that target 'Self' (like Shield, Mage Armor, etc.) in the ring."
+      }
+    }
+  }
+}

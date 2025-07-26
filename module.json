@@ -1,0 +1,51 @@
+{
+  "id": "ring-of-spell-storing",
+  "title": "Ring of Spell Storing",
+  "description": "A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5th Edition, featuring spell storage mechanics, original caster statistics tracking, and intuitive UI management.",
+  "authors": [
+    {
+      "name": "Andrew Gari",
+      "email": "covadax.ag@gmail.com"
+    }
+  ],
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12",
+    "maximum": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "3.0.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/ring-of-spell-storing.js"
+  ],
+  "styles": [
+    "styles/ring-styles.css"
+  ],
+  "templates": [
+    "templates/ring-interface.hbs"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "url": "https://github.com/andrewgari/ring-of-spell-storing",
+  "manifest": "https://raw.githubusercontent.com/andrewgari/ring-of-spell-storing/main/module.json",
+  "download": "https://github.com/andrewgari/ring-of-spell-storing/releases/latest/download/ring-of-spell-storing.zip",
+  "license": "MIT",
+  "readme": "README.md",
+  "bugs": "https://github.com/andrewgari/ring-of-spell-storing/issues",
+  "changelog": "CHANGELOG.md"
+}

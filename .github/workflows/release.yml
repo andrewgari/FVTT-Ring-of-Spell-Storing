@@ -1,0 +1,64 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Update module.json version
+      run: |
+        sed -i 's/"version": ".*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' module.json
+        
+    - name: Create module archive
+      run: |
+        zip -r ring-of-spell-storing.zip . \
+          -x "*.git*" \
+          -x "node_modules/*" \
+          -x ".github/*" \
+          -x "*.md" \
+          -x ".gitignore"
+          
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## Ring of Spell Storing v${{ steps.get_version.outputs.VERSION }}
+          
+          ### Installation
+          Use this manifest URL in Foundry VTT:
+          ```
+          https://raw.githubusercontent.com/andrewgari/ring-of-spell-storing/main/module.json
+          ```
+          
+          ### Changes
+          See [CHANGELOG.md](https://github.com/andrewgari/ring-of-spell-storing/blob/main/CHANGELOG.md) for detailed changes.
+          
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./ring-of-spell-storing.zip
+        asset_name: ring-of-spell-storing.zip
+        asset_content_type: application/zip
