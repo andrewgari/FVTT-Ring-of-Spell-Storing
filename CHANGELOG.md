@@ -1,3 +1,8 @@
+## [1.0.8] - 2025-07-26
+
+### Changes
+- 🔧 Fix git hook and JavaScript validation issues%0A- 🔧 Enhanced auto-release to support both direct pushes and PR merges%0A- 🚀 Add automatic release on main push + clean release names%0A- 🔧 Enhanced ring update with multiple approaches + Foundry v13 support%0A- 🔧 Fix ring data persistence issue - root cause identified
+
 ## [1.0.7] - 2025-07-26
 
 ### Changes
