@@ -4,6 +4,7 @@
  */
 
 import { RingInterface } from './ring-interface.js';
+import { RingDiagnostics } from './ring-diagnostics.js';
 
 // Module constants
 const MODULE_ID = 'ring-of-spell-storing';
@@ -118,7 +119,10 @@ class RingOfSpellStoring {
       debugActorRings: this.debugActorRings.bind(this),
       debugActorItems: this.debugActorItems.bind(this),
       forceRenderSheet: this.forceRenderSheet.bind(this),
-      testUIInjection: this.testUIInjection.bind(this)
+      testUIInjection: this.testUIInjection.bind(this),
+      // Diagnostic methods
+      runDiagnostics: RingDiagnostics.diagnoseCharacterSheetIntegration.bind(RingDiagnostics),
+      checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics)
     };
 
     game.modules.get(MODULE_ID).api = api;
@@ -196,17 +200,116 @@ class RingOfSpellStoring {
       const rings = this.findRingsOnActor(actor);
       console.log(`${MODULE_ID} | Found ${rings.length} rings on ${actor.name}`);
 
+      // Detect sheet type for better compatibility
+      const sheetType = this.detectSheetType(sheet);
+      console.log(`${MODULE_ID} | Detected sheet type: ${sheetType}`);
+
       if (rings.length > 0) {
         console.log(`${MODULE_ID} | Adding ring spells to spell list`);
-        this.addAllRingSpellsToSpellList(html, actor, rings).catch(error => {
-          console.error(`${MODULE_ID} | Error adding ring spells:`, error);
-        });
+        // Add a small delay to ensure the sheet is fully rendered
+        setTimeout(() => {
+          this.addAllRingSpellsToSpellList(html, actor, rings, sheetType).catch(error => {
+            console.error(`${MODULE_ID} | Error adding ring spells:`, error);
+          });
+        }, 100);
       } else {
         console.log(`${MODULE_ID} | No rings found, checking all items for debugging`);
         this.debugActorItems(actor);
       }
     } catch (error) {
       console.error(`${MODULE_ID} | Error in onRenderActorSheet:`, error);
+    }
+  }
+
+  /**
+   * Detect the type of character sheet being used
+   */
+  static detectSheetType(sheet) {
+    const className = sheet.constructor.name;
+    const sheetElement = sheet.element;
+
+    // Check for specific sheet types
+    if (className.includes('Tidy5e') || sheetElement.hasClass('tidy5e')) {
+      return 'tidy5e';
+    }
+    if (className.includes('DarkMode') || sheetElement.hasClass('dark-mode')) {
+      return 'darkmode';
+    }
+    if (className.includes('ActorSheet5eCharacter')) {
+      return 'dnd5e-default';
+    }
+    if (className.includes('ActorSheet5e')) {
+      return 'dnd5e-legacy';
+    }
+
+    // Check for common sheet indicators in the DOM
+    if (sheetElement.find('.tidy5e-spells').length > 0) {
+      return 'tidy5e';
+    }
+    if (sheetElement.find('.spellcasting-ability').length > 0) {
+      return 'dnd5e-modern';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Get sheet-specific selectors for finding spell containers
+   */
+  static getSheetSpecificSelectors(sheetType) {
+    const baseSelectors = [
+      // Standard D&D 5e selectors
+      '.tab[data-tab="spells"]',
+      '.tab[data-tab="features"]',
+      '.tab.spells',
+      '.tab.features',
+      // Content area selectors
+      '.spells',
+      '.spellbook',
+      '.spellcasting',
+      '.spell-list',
+      '.spells-content'
+    ];
+
+    switch (sheetType) {
+    case 'tidy5e':
+      return [
+        '.tidy5e-spells',
+        '.spells-tab',
+        '.tab[data-tab="spells"]',
+        '.spellbook',
+        ...baseSelectors
+      ];
+
+    case 'dnd5e-default':
+    case 'dnd5e-modern':
+      return [
+        '.tab[data-tab="spells"]',
+        '.spellbook',
+        '.spellcasting',
+        '.tab.spells',
+        ...baseSelectors
+      ];
+
+    case 'darkmode':
+      return [
+        '.tab[data-tab="spells"]',
+        '.dark-mode .spells',
+        '.spellbook',
+        ...baseSelectors
+      ];
+
+    default:
+      return [
+        ...baseSelectors,
+        // Additional fallback selectors
+        '.features-tab',
+        '.inventory',
+        '.tab-content[data-tab="spells"]',
+        '.sheet-body .spells',
+        '[data-tab="spells"]',
+        '.tab-content'
+      ];
     }
   }
 
@@ -348,18 +451,12 @@ class RingOfSpellStoring {
   /**
    * Add all ring spells to the spell list on character sheet
    */
-  static async addAllRingSpellsToSpellList(html, actor, rings) {
+  static async addAllRingSpellsToSpellList(html, actor, rings, sheetType = 'unknown') {
     try {
-      console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name} (${rings.length} rings)`);
+      console.log(`${MODULE_ID} | Adding ring spells to spell list for ${actor.name} (${rings.length} rings, sheet: ${sheetType})`);
 
-      // Try multiple possible tab selectors
-      const possibleTabSelectors = [
-        '.tab[data-tab="spells"]',
-        '.tab[data-tab="features"]',
-        '.spells',
-        '.spellbook',
-        '.inventory'
-      ];
+      // Get sheet-specific selectors based on detected type
+      const possibleTabSelectors = this.getSheetSpecificSelectors(sheetType);
 
       let spellsTab = null;
       for (const selector of possibleTabSelectors) {

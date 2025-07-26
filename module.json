@@ -29,7 +29,8 @@
     "scripts/ring-of-spell-storing.js"
   ],
   "scripts": [
-    "scripts/ring-test.js"
+    "scripts/ring-test.js",
+    "scripts/ring-quick-test.js"
   ],
   "styles": [
     "styles/ring-styles.css"

@@ -50,6 +50,183 @@ export class RingDiagnostics {
   }
 
   /**
+   * Comprehensive diagnostic for character sheet integration
+   */
+  static async diagnoseCharacterSheetIntegration(actor = null) {
+    console.log('=== CHARACTER SHEET INTEGRATION DIAGNOSTIC ===');
+
+    // Use current character if none provided
+    if (!actor) {
+      actor = game.user.character;
+      if (!actor) {
+        console.error('No character selected. Please select a character or pass an actor.');
+        return false;
+      }
+    }
+
+    console.log(`Diagnosing character: ${actor.name}`);
+
+    // 1. Check if module is working
+    const moduleWorking = this.checkModuleInitialization();
+    const settingsWorking = this.checkModuleSettings();
+
+    if (!moduleWorking || !settingsWorking) {
+      console.error('Module or settings not working properly');
+      return false;
+    }
+
+    // 2. Check for rings on character
+    const api = game.modules.get(MODULE_ID)?.api;
+    if (!api) {
+      console.error('Module API not available');
+      return false;
+    }
+
+    const rings = api.findRingsOnActor(actor);
+    console.log(`Found ${rings.length} rings on character`);
+
+    if (rings.length === 0) {
+      console.warn('No rings found. Creating a test ring...');
+      await this.createTestRing(actor);
+      return false;
+    }
+
+    // 3. Check character sheet
+    const sheet = actor.sheet;
+    if (!sheet || !sheet.rendered) {
+      console.error('Character sheet not rendered');
+      return false;
+    }
+
+    console.log(`Character sheet type: ${sheet.constructor.name}`);
+
+    // 4. Analyze sheet DOM structure
+    const html = sheet.element;
+    this.analyzeSheetDOM(html);
+
+    // 5. Test hook registration
+    this.testHookRegistration();
+
+    // 6. Force UI injection test
+    console.log('Testing manual UI injection...');
+    api.testUIInjection(actor);
+
+    return true;
+  }
+
+  /**
+   * Analyze the DOM structure of the character sheet
+   */
+  static analyzeSheetDOM(html) {
+    console.log('=== DOM STRUCTURE ANALYSIS ===');
+
+    // Check for common tab selectors
+    const tabSelectors = [
+      '.tab[data-tab="spells"]',
+      '.tab[data-tab="features"]',
+      '.spells',
+      '.spellbook',
+      '.inventory',
+      '.tab.spells',
+      '.tab.features'
+    ];
+
+    console.log('Testing tab selectors:');
+    tabSelectors.forEach(selector => {
+      const elements = html.find(selector);
+      console.log(`  ${selector}: ${elements.length} elements found`);
+      if (elements.length > 0) {
+        console.log(`    First element classes:`, elements.first().attr('class'));
+        console.log(`    First element data attributes:`, elements.first().get(0)?.dataset);
+      }
+    });
+
+    // Check for spell list containers
+    const spellContainers = [
+      '.spellbook',
+      '.spell-list',
+      '.spells-content',
+      '.tab-content',
+      '.spellcasting'
+    ];
+
+    console.log('Testing spell container selectors:');
+    spellContainers.forEach(selector => {
+      const elements = html.find(selector);
+      console.log(`  ${selector}: ${elements.length} elements found`);
+    });
+
+    // List all tabs found
+    const allTabs = html.find('.tab, [data-tab]');
+    console.log(`Total tabs found: ${allTabs.length}`);
+    allTabs.each((i, tab) => {
+      const $tab = $(tab);
+      console.log(`  Tab ${i}: class="${$tab.attr('class')}" data-tab="${$tab.attr('data-tab')}"`);
+    });
+  }
+
+  /**
+   * Test if hooks are properly registered
+   */
+  static testHookRegistration() {
+    console.log('=== HOOK REGISTRATION TEST ===');
+
+    const hookNames = [
+      'renderActorSheet',
+      'renderActorSheet5eCharacter',
+      'renderActorSheet5eCharacter2',
+      'renderActorSheet5e',
+      'renderDnd5eActorSheet'
+    ];
+
+    hookNames.forEach(hookName => {
+      const hooks = Hooks._hooks[hookName] || [];
+      const ringHooks = hooks.filter(hook =>
+        hook.fn.toString().includes('ring-of-spell-storing') ||
+        hook.fn.toString().includes('onRenderActorSheet')
+      );
+      console.log(`${hookName}: ${ringHooks.length} ring-related hooks registered`);
+    });
+  }
+
+  /**
+   * Create a test ring for diagnostic purposes
+   */
+  static async createTestRing(actor) {
+    console.log('=== CREATING TEST RING ===');
+
+    try {
+      const ringData = {
+        name: 'Ring of Spell Storing',
+        type: 'equipment',
+        system: {
+          equipped: true,
+          attunement: 1, // Required attunement
+          rarity: 'rare',
+          flags: {
+            [MODULE_ID]: {
+              storedSpells: []
+            }
+          }
+        }
+      };
+
+      const ring = await actor.createEmbeddedDocuments('Item', [ringData]);
+      console.log('Test ring created:', ring[0].name);
+
+      // Force sheet re-render
+      if (actor.sheet.rendered) {
+        actor.sheet.render(false);
+      }
+
+      return ring[0];
+    } catch (error) {
+      console.error('Failed to create test ring:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check for rings on all actors
    */
   static checkActorsForRings() {
