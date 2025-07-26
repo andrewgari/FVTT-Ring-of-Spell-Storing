@@ -1,3 +1,8 @@
+## [1.0.16] - 2025-07-26
+
+### Changes
+- Improve character sheet integration with enhanced diagnostics and sheet type detection
+
 ## [1.0.15] - 2025-07-26
 
 ### Changes
