@@ -1,3 +1,8 @@
+## [1.0.9] - 2025-07-26
+
+### Changes
+- 📝 Add workflow status confirmation to README%0A- 🔧 Fix GitHub Actions workflow failures%0A- 🧹 Remove unnecessary manual scripts - GitHub Actions handles everything%0A- 🔧 Fix ESLint issues in test files
+
 ## [1.0.8] - 2025-07-26
 
 ### Changes
