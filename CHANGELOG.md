@@ -1,3 +1,8 @@
+## [1.0.12] - 2025-07-26
+
+### Changes
+- 🔧 Add diagnostics for Ring of Spell Storing module
+
 ## [1.0.11] - 2025-07-26
 
 ### Changes
