@@ -1,3 +1,8 @@
+## [1.0.17] - 2025-07-29
+
+### Changes
+- Redesign Ring of Spell Storing to be item-centric instead of character sheet-centric%0A- Enhance diagnostics for GM use and focus on Priority 1 requirements
+
 ## [1.0.16] - 2025-07-26
 
 ### Changes
