@@ -1,0 +1,75 @@
+<div class="ring-spell-management-embedded">
+  <div class="ring-interface-header">
+    <h3 style="margin: 0 0 15px 0; color: #4169e1; display: flex; align-items: center; gap: 8px;">
+      <i class="fas fa-magic"></i>
+      {{localize "RING_OF_SPELL_STORING.Interface.Title"}}
+    </h3>
+  </div>
+  
+  <div class="ring-interface-content">
+    <!-- Capacity Display -->
+    <div class="ring-capacity" style="margin-bottom: 15px;">
+      <div class="capacity-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <span><strong>{{localize "RING_OF_SPELL_STORING.Interface.Capacity"}}:</strong> {{usedLevels}}/{{maxLevels}}</span>
+        <span style="color: {{#if remainingLevels}}#28a745{{else}}#dc3545{{/if}};">
+          <strong>{{localize "RING_OF_SPELL_STORING.Interface.RemainingLevels"}}: {{remainingLevels}}</strong>
+        </span>
+      </div>
+      <div class="capacity-bar" style="width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden;">
+        <div class="capacity-fill" style="width: {{capacityPercentage}}%; height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); transition: width 0.3s ease;"></div>
+      </div>
+    </div>
+
+    <!-- Stored Spells List -->
+    <div class="stored-spells-section">
+      <h4 style="margin: 0 0 10px 0;">{{localize "RING_OF_SPELL_STORING.Interface.StoredSpells"}} ({{storedSpells.length}})</h4>
+      <div class="stored-spells-list" style="max-height: 200px; overflow-y: auto;">
+        {{#if storedSpells.length}}
+          {{#each storedSpells}}
+          <div class="stored-spell-item" data-spell-id="{{@index}}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: white; border-radius: 4px; border-left: 4px solid #4169e1;">
+            <div class="spell-details">
+              <div class="spell-name" style="font-weight: bold;">{{name}} (Level {{level}})</div>
+              <div class="spell-info" style="font-size: 12px; color: #666;">
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.OriginalCaster"}}: {{originalCaster.name}}</div>
+                {{#if originalCaster.spellAttackBonus}}
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.SpellAttackBonus"}}: +{{originalCaster.spellAttackBonus}}</div>
+                {{/if}}
+                {{#if originalCaster.spellSaveDC}}
+                <div>{{localize "RING_OF_SPELL_STORING.Interface.SpellSaveDC"}}: {{originalCaster.spellSaveDC}}</div>
+                {{/if}}
+              </div>
+            </div>
+            <div class="spell-actions" style="display: flex; gap: 5px;">
+              {{#if ../canCast}}
+              <button class="spell-action-btn cast" data-action="cast" data-spell-id="{{@index}}" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                <i class="fas fa-magic"></i> {{localize "RING_OF_SPELL_STORING.Interface.CastSpell"}}
+              </button>
+              {{/if}}
+              {{#if ../canManage}}
+              <button class="spell-action-btn remove" data-action="remove" data-spell-id="{{@index}}" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                <i class="fas fa-trash"></i> {{localize "RING_OF_SPELL_STORING.Interface.RemoveSpell"}}
+              </button>
+              {{/if}}
+            </div>
+          </div>
+          {{/each}}
+        {{else}}
+          <div class="no-spells-message" style="color: #666; font-style: italic; text-align: center; padding: 20px;">
+            {{localize "RING_OF_SPELL_STORING.Interface.NoSpellsStored"}}
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+
+  <div class="ring-interface-footer" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+    <button class="open-full-interface-btn" style="background: #4169e1; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+      <i class="fas fa-cog"></i> {{localize "RING_OF_SPELL_STORING.Interface.OpenFullInterface"}}
+    </button>
+    {{#if canStore}}
+    <button class="store-spell-btn" data-action="store" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+      <i class="fas fa-plus"></i> {{localize "RING_OF_SPELL_STORING.Interface.StoreSpell"}}
+    </button>
+    {{/if}}
+  </div>
+</div>

@@ -14,7 +14,9 @@
       "SpellLevel": "Spell Level",
       "SpellAttackBonus": "Spell Attack Bonus",
       "SpellSaveDC": "Spell Save DC",
-      "Close": "Close"
+      "Close": "Close",
+      "OpenFullInterface": "Open Full Management",
+      "ManageSpells": "Manage Spells"
     },
     "SpellList": {
       "SectionTitle": "Ring of Spell Storing",

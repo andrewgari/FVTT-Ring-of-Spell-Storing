@@ -36,7 +36,8 @@
     "styles/ring-styles.css"
   ],
   "templates": [
-    "templates/ring-interface.hbs"
+    "templates/ring-interface.hbs",
+    "templates/ring-item-interface.hbs"
   ],
   "languages": [
     {

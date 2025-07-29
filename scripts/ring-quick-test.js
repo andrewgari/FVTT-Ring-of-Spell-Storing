@@ -5,7 +5,7 @@
 
 // Quick diagnostic function you can run in the console
 window.ringQuickTest = function(targetActor = null) {
-  console.log('=== RING OF SPELL STORING QUICK TEST ===');
+  console.log('=== RING OF SPELL STORING QUICK TEST (ITEM-CENTRIC) ===');
 
   const MODULE_ID = 'ring-of-spell-storing';
 
@@ -92,59 +92,55 @@ window.ringQuickTest = function(targetActor = null) {
   const sheet = actor.sheet;
   console.log('5. Character sheet:', sheet?.constructor.name || 'Not rendered');
 
-  if (!sheet?.rendered) {
-    console.error('❌ Character sheet not open! Please open the character sheet.');
+  // 6. Test item-centric approach
+  console.log('6. Testing item-centric approach...');
+
+  const ring = rings[0]; // Test with first ring
+  console.log(`   Testing with ring: ${ring.name} (ID: ${ring.id})`);
+
+  // Check if ring is recognized
+  const isRing = api.isRingOfSpellStoring(ring);
+  console.log(`   Ring recognized: ${isRing}`);
+
+  if (!isRing) {
+    console.error('❌ Ring not recognized by isRingOfSpellStoring method!');
     return false;
   }
 
-  // 6. Test DOM selectors
-  console.log('6. Testing DOM selectors...');
-  const html = sheet.element;
+  // 7. Test opening ring item sheet
+  console.log('7. Testing ring item sheet...');
 
-  const selectors = [
-    '.tab[data-tab="spells"]',
-    '.tab[data-tab="features"]',
-    '.spells',
-    '.spellbook',
-    '.tab.spells'
-  ];
-
-  let foundContainer = false;
-  selectors.forEach(selector => {
-    const elements = html.find(selector);
-    console.log(`   ${selector}: ${elements.length} found`);
-    if (elements.length > 0) {
-      foundContainer = true;
+  if (ring.sheet && ring.sheet.rendered) {
+    console.log('✅ Ring item sheet is already open');
+    console.log('   Check the ring item sheet for the spell management interface!');
+  } else {
+    console.log('⚠️ Ring item sheet not open. Opening it now...');
+    try {
+      ring.sheet.render(true);
+      console.log('✅ Ring item sheet opened - check for spell management interface!');
+    } catch (error) {
+      console.error('❌ Failed to open ring item sheet:', error);
+      return false;
     }
-  });
-
-  if (!foundContainer) {
-    console.error('❌ No suitable spell container found in sheet!');
-    console.log('Available tabs:');
-    html.find('.tab, [data-tab]').each((i, tab) => {
-      const $tab = $(tab);
-      console.log(`   Tab: class="${$tab.attr('class')}" data-tab="${$tab.attr('data-tab')}"`);
-    });
-    return false;
   }
 
-  // 7. Test manual UI injection
-  console.log('7. Testing manual UI injection...');
-  try {
-    api.testUIInjection(actor);
-    console.log('✅ Manual UI injection completed - check your character sheet!');
-  } catch (error) {
-    console.error('❌ Manual UI injection failed:', error);
-    return false;
-  }
-
-  // 8. Run full diagnostics
-  console.log('8. Running full diagnostics...');
-  api.runDiagnostics(actor);
+  // 8. Instructions for user
+  console.log('8. Next steps...');
+  console.log('   📝 To test the new item-centric interface:');
+  console.log('   1. Right-click the Ring of Spell Storing in your inventory');
+  console.log('   2. Select "Edit" or double-click the ring');
+  console.log('   3. Look for the "Spell Storage Management" section');
+  console.log('   4. Use the buttons to store, cast, or manage spells');
+  console.log('');
+  console.log('   🎯 This new approach eliminates character sheet compatibility issues!');
+  console.log('   🎯 The ring is now a self-contained magical item!');
 
   console.log('=== TEST COMPLETE ===');
-  console.log('✅ If you see ring sections on your character sheet, the module is working!');
+  console.log('✅ If you see the spell management interface in the ring item sheet, the module is working!');
   console.log('⚠️ If not, check the console errors above for specific issues.');
+  console.log('');
+  console.log('🔄 The module has been redesigned to be item-centric rather than character sheet-centric.');
+  console.log('📋 This should resolve all character sheet compatibility issues!');
 
   return true;
 };

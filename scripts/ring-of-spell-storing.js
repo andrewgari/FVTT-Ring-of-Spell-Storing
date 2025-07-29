@@ -65,23 +65,11 @@ class RingOfSpellStoring {
     // Hook into ready event
     Hooks.on('ready', this.onReady.bind(this));
 
-    // Hook into actor sheet rendering to add ring spells to spell list
-    // Register for multiple possible sheet types to ensure compatibility
-    const sheetHooks = [
-      'renderActorSheet',
-      'renderActorSheet5eCharacter',
-      'renderActorSheet5eCharacter2',
-      'renderActorSheet5e',
-      'renderDnd5eActorSheet'
-    ];
+    // Hook into item sheet rendering to add ring spell management
+    Hooks.on('renderItemSheet', this.onRenderItemSheet.bind(this));
+    console.log(`${MODULE_ID} | Registered hook: renderItemSheet`);
 
-    sheetHooks.forEach(hookName => {
-      Hooks.on(hookName, this.onRenderActorSheet.bind(this));
-      console.log(`${MODULE_ID} | Registered hook: ${hookName}`);
-    });
 
-    // Hook into actor data preparation to inject ring spells
-    Hooks.on('dnd5e.prepareActorData', this.onPrepareActorData.bind(this));
 
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
@@ -118,8 +106,9 @@ class RingOfSpellStoring {
       castRingSpellFromList: this.castRingSpellFromList.bind(this),
       debugActorRings: this.debugActorRings.bind(this),
       debugActorItems: this.debugActorItems.bind(this),
-      forceRenderSheet: this.forceRenderSheet.bind(this),
-      testUIInjection: this.testUIInjection.bind(this),
+      // Item-centric methods
+      isRingOfSpellStoring: this.isRingOfSpellStoring.bind(this),
+      addSpellManagementToItemSheet: this.addSpellManagementToItemSheet.bind(this),
       // Diagnostic methods
       runDiagnostics: RingDiagnostics.diagnoseCharacterSheetIntegration.bind(RingDiagnostics),
       checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics),
@@ -148,6 +137,7 @@ class RingOfSpellStoring {
 
   /**
    * Handle actor data preparation to inject ring spells
+   * @deprecated - Moving to item-centric design, this method is no longer used
    */
   static onPrepareActorData(actor) {
     if (actor.type !== 'character') {
@@ -179,49 +169,265 @@ class RingOfSpellStoring {
   }
 
   /**
-   * Handle actor sheet rendering to add ring spell sections
+   * Handle item sheet rendering to add ring spell management interface
    */
-  static onRenderActorSheet(sheet, html, _data) {
+  static onRenderItemSheet(sheet, html, _data) {
     try {
-      console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name} (sheet type: ${sheet.constructor.name})`);
+      const item = sheet.item;
+      console.log(`${MODULE_ID} | onRenderItemSheet called for ${item.name} (type: ${item.type})`);
 
-      // Check if this is a character sheet
-      if (sheet.actor.type !== 'character') {
-        console.log(`${MODULE_ID} | Skipping non-character actor: ${sheet.actor.type}`);
+      // Check if this is a Ring of Spell Storing
+      if (!this.isRingOfSpellStoring(item)) {
         return;
       }
 
+      console.log(`${MODULE_ID} | Detected Ring of Spell Storing: ${item.name}`);
+
       // Check module setting
       const showInterface = game.settings.get(MODULE_ID, 'showInterface');
-      console.log(`${MODULE_ID} | Show interface setting: ${showInterface}`);
       if (!showInterface) {
         console.log(`${MODULE_ID} | Interface disabled in settings`);
         return;
       }
 
-      const actor = sheet.actor;
-      const rings = this.findRingsOnActor(actor);
-      console.log(`${MODULE_ID} | Found ${rings.length} rings on ${actor.name}`);
+      // Add spell management interface to the item sheet
+      this.addSpellManagementToItemSheet(html, item).catch(error => {
+        console.error(`${MODULE_ID} | Error adding spell management interface:`, error);
+      });
 
-      // Detect sheet type for better compatibility
-      const sheetType = this.detectSheetType(sheet);
-      console.log(`${MODULE_ID} | Detected sheet type: ${sheetType}`);
-
-      if (rings.length > 0) {
-        console.log(`${MODULE_ID} | Adding ring spells to spell list`);
-        // Add a small delay to ensure the sheet is fully rendered
-        setTimeout(() => {
-          this.addAllRingSpellsToSpellList(html, actor, rings, sheetType).catch(error => {
-            console.error(`${MODULE_ID} | Error adding ring spells:`, error);
-          });
-        }, 100);
-      } else {
-        console.log(`${MODULE_ID} | No rings found, checking all items for debugging`);
-        this.debugActorItems(actor);
-      }
     } catch (error) {
-      console.error(`${MODULE_ID} | Error in onRenderActorSheet:`, error);
+      console.error(`${MODULE_ID} | Error in onRenderItemSheet:`, error);
     }
+  }
+
+  /**
+   * Check if an item is a Ring of Spell Storing
+   */
+  static isRingOfSpellStoring(item) {
+    if (item.type !== 'equipment') {
+      return false;
+    }
+
+    // Check by name (primary method)
+    if (item.name === RING_ITEM_NAME) {
+      return true;
+    }
+
+    // Check by flags (for items that have been modified)
+    if (item.system.flags?.[MODULE_ID]) {
+      return true;
+    }
+
+    // Check by description or other identifiers if needed
+    const description = item.system.description?.value || '';
+    if (description.toLowerCase().includes('ring of spell storing')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Add spell management interface to the Ring of Spell Storing item sheet
+   */
+  static async addSpellManagementToItemSheet(html, ring) {
+    try {
+      console.log(`${MODULE_ID} | Adding spell management interface to ${ring.name}`);
+
+      // Get ring data
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      const storedSpells = ringData.storedSpells || [];
+      const usedLevels = storedSpells.reduce((sum, spell) => sum + spell.level, 0);
+      const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
+
+      // Find a good place to inject the interface
+      const targetSelectors = [
+        '.tab[data-tab="details"]',  // D&D 5e default
+        '.tab[data-tab="description"]',
+        '.sheet-body',
+        '.window-content'
+      ];
+
+      let targetContainer = null;
+      for (const selector of targetSelectors) {
+        targetContainer = html.find(selector);
+        if (targetContainer.length > 0) {
+          console.log(`${MODULE_ID} | Found target container: ${selector}`);
+          break;
+        }
+      }
+
+      if (!targetContainer || targetContainer.length === 0) {
+        console.warn(`${MODULE_ID} | No suitable container found for spell management interface`);
+        return;
+      }
+
+      // Create the spell management section
+      const spellManagementSection = $(`
+        <div class="ring-spell-management" style="border: 2px solid #4169e1; border-radius: 8px; padding: 15px; margin: 10px 0; background: #f8f9ff;">
+          <h3 style="margin: 0 0 15px 0; color: #4169e1; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-magic"></i>
+            Spell Storage Management
+          </h3>
+
+          <div class="capacity-display" style="margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <span><strong>Capacity:</strong> ${usedLevels}/${MAX_SPELL_LEVELS} spell levels used</span>
+              <span style="color: ${remainingLevels > 0 ? '#28a745' : '#dc3545'};">
+                <strong>${remainingLevels} levels remaining</strong>
+              </span>
+            </div>
+            <div class="capacity-bar" style="width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden;">
+              <div class="capacity-fill" style="width: ${(usedLevels / MAX_SPELL_LEVELS) * 100}%; height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <div class="stored-spells-summary" style="margin-bottom: 15px;">
+            <h4 style="margin: 0 0 10px 0;">Stored Spells (${storedSpells.length})</h4>
+            <div class="spells-list" style="max-height: 200px; overflow-y: auto;">
+              ${storedSpells.length === 0 ?
+    '<p style="color: #666; font-style: italic;">No spells currently stored</p>' :
+    storedSpells.map((spell, index) => `
+                  <div class="stored-spell-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: white; border-radius: 4px; border-left: 4px solid #4169e1;">
+                    <div>
+                      <strong>${spell.name}</strong> (Level ${spell.level})
+                      <br><small style="color: #666;">Cast by: ${spell.originalCaster.name}</small>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                      <button class="cast-spell-btn" data-spell-index="${index}" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-magic"></i> Cast
+                      </button>
+                      <button class="remove-spell-btn" data-spell-index="${index}" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-trash"></i> Remove
+                      </button>
+                    </div>
+                  </div>
+                `).join('')
+}
+            </div>
+          </div>
+
+          <div class="management-buttons" style="display: flex; gap: 10px; justify-content: center;">
+            <button class="open-full-interface-btn" style="background: #4169e1; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+              <i class="fas fa-cog"></i> Open Full Spell Management
+            </button>
+            <button class="store-spell-btn" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+              <i class="fas fa-plus"></i> Store New Spell
+            </button>
+          </div>
+        </div>
+      `);
+
+      // Add event handlers
+      this.attachItemSheetEventHandlers(spellManagementSection, ring);
+
+      // Insert the section into the item sheet
+      targetContainer.append(spellManagementSection);
+
+      console.log(`${MODULE_ID} | Successfully added spell management interface to ${ring.name}`);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in addSpellManagementToItemSheet:`, error);
+    }
+  }
+
+  /**
+   * Attach event handlers to the item sheet spell management interface
+   */
+  static attachItemSheetEventHandlers(spellManagementSection, ring) {
+    // Open full interface button
+    spellManagementSection.find('.open-full-interface-btn').on('click', (event) => {
+      event.preventDefault();
+      console.log(`${MODULE_ID} | Opening full interface for ${ring.name}`);
+
+      // Find the actor who owns this ring
+      const actor = ring.parent;
+      if (actor) {
+        this.openRingInterface(actor, ring);
+      } else {
+        ui.notifications.warn('Cannot open ring interface: ring is not owned by a character');
+      }
+    });
+
+    // Store new spell button
+    spellManagementSection.find('.store-spell-btn').on('click', (event) => {
+      event.preventDefault();
+      console.log(`${MODULE_ID} | Store spell button clicked for ${ring.name}`);
+
+      const actor = ring.parent;
+      if (actor) {
+        // Open the ring interface in "store spell" mode
+        const ringInterface = new RingInterface(actor, ring);
+        ringInterface.render(true);
+
+        // Trigger the store spell dialog after a short delay
+        setTimeout(() => {
+          const storeButton = ringInterface.element.find('.store-spell-btn');
+          if (storeButton.length > 0) {
+            storeButton.click();
+          }
+        }, 500);
+      } else {
+        ui.notifications.warn('Cannot store spell: ring is not owned by a character');
+      }
+    });
+
+    // Cast spell buttons
+    spellManagementSection.find('.cast-spell-btn').on('click', async(event) => {
+      event.preventDefault();
+      const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
+      console.log(`${MODULE_ID} | Cast spell button clicked for spell index ${spellIndex}`);
+
+      const actor = ring.parent;
+      if (actor) {
+        await this.castSpellFromRing(actor, ring, spellIndex);
+
+        // Refresh the item sheet to show updated spell list
+        if (ring.sheet && ring.sheet.rendered) {
+          ring.sheet.render(false);
+        }
+      } else {
+        ui.notifications.warn('Cannot cast spell: ring is not owned by a character');
+      }
+    });
+
+    // Remove spell buttons
+    spellManagementSection.find('.remove-spell-btn').on('click', async(event) => {
+      event.preventDefault();
+      const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
+      console.log(`${MODULE_ID} | Remove spell button clicked for spell index ${spellIndex}`);
+
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      const spell = ringData.storedSpells[spellIndex];
+
+      if (!spell) {
+        ui.notifications.error('Spell not found');
+        return;
+      }
+
+      // Confirm removal
+      const confirmed = await Dialog.confirm({
+        title: 'Remove Spell',
+        content: `<p>Are you sure you want to remove <strong>${spell.name}</strong> from the ring?</p>
+                  <p><em>This action cannot be undone.</em></p>`,
+        yes: () => true,
+        no: () => false
+      });
+
+      if (confirmed) {
+        const actor = ring.parent;
+        if (actor) {
+          await this.removeSpellFromRing(actor, ring, spellIndex);
+
+          // Refresh the item sheet to show updated spell list
+          if (ring.sheet && ring.sheet.rendered) {
+            ring.sheet.render(false);
+          }
+        } else {
+          ui.notifications.warn('Cannot remove spell: ring is not owned by a character');
+        }
+      }
+    });
   }
 
   /**
@@ -453,6 +659,7 @@ class RingOfSpellStoring {
 
   /**
    * Add all ring spells to the spell list on character sheet
+   * @deprecated - Moving to item-centric design, this method is no longer used
    */
   static async addAllRingSpellsToSpellList(html, actor, rings, sheetType = 'unknown') {
     try {
@@ -503,6 +710,7 @@ class RingOfSpellStoring {
 
   /**
    * Add spells from a single ring to the spell list
+   * @deprecated - Moving to item-centric design, this method is no longer used
    */
   static async addSingleRingSpellsToSpellList(html, actor, ring, ringIndex, spellsTab) {
     try {
