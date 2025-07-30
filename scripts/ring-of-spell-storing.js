@@ -69,7 +69,23 @@ class RingOfSpellStoring {
     Hooks.on('renderItemSheet', this.onRenderItemSheet.bind(this));
     console.log(`${MODULE_ID} | Registered hook: renderItemSheet`);
 
+    // Hook into actor sheet rendering to add ring spells to spell list
+    // Register for multiple possible sheet types to ensure compatibility
+    const sheetHooks = [
+      'renderActorSheet',
+      'renderActorSheet5eCharacter',
+      'renderActorSheet5eCharacter2',
+      'renderActorSheet5e',
+      'renderDnd5eActorSheet'
+    ];
 
+    sheetHooks.forEach(hookName => {
+      Hooks.on(hookName, this.onRenderActorSheet.bind(this));
+      console.log(`${MODULE_ID} | Registered hook: ${hookName}`);
+    });
+
+    // Hook into actor data preparation to inject ring spells
+    Hooks.on('dnd5e.prepareActorData', this.onPrepareActorData.bind(this));
 
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
@@ -137,7 +153,6 @@ class RingOfSpellStoring {
 
   /**
    * Handle actor data preparation to inject ring spells
-   * @deprecated - Moving to item-centric design, this method is no longer used
    */
   static onPrepareActorData(actor) {
     if (actor.type !== 'character') {
@@ -166,6 +181,52 @@ class RingOfSpellStoring {
         };
       }
     });
+  }
+
+  /**
+   * Handle actor sheet rendering to add ring spell sections
+   */
+  static onRenderActorSheet(sheet, html, _data) {
+    try {
+      console.log(`${MODULE_ID} | onRenderActorSheet called for ${sheet.actor.name} (sheet type: ${sheet.constructor.name})`);
+
+      // Check if this is a character sheet
+      if (sheet.actor.type !== 'character') {
+        console.log(`${MODULE_ID} | Skipping non-character actor: ${sheet.actor.type}`);
+        return;
+      }
+
+      // Check module setting
+      const showInterface = game.settings.get(MODULE_ID, 'showInterface');
+      console.log(`${MODULE_ID} | Show interface setting: ${showInterface}`);
+      if (!showInterface) {
+        console.log(`${MODULE_ID} | Interface disabled in settings`);
+        return;
+      }
+
+      const actor = sheet.actor;
+      const rings = this.findRingsOnActor(actor);
+      console.log(`${MODULE_ID} | Found ${rings.length} rings on ${actor.name}`);
+
+      // Detect sheet type for better compatibility
+      const sheetType = this.detectSheetType(sheet);
+      console.log(`${MODULE_ID} | Detected sheet type: ${sheetType}`);
+
+      if (rings.length > 0) {
+        console.log(`${MODULE_ID} | Adding ring spells to spell list`);
+        // Add a small delay to ensure the sheet is fully rendered
+        setTimeout(() => {
+          this.addAllRingSpellsToSpellList(html, actor, rings, sheetType).catch(error => {
+            console.error(`${MODULE_ID} | Error adding ring spells:`, error);
+          });
+        }, 100);
+      } else {
+        console.log(`${MODULE_ID} | No rings found, checking all items for debugging`);
+        this.debugActorItems(actor);
+      }
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in onRenderActorSheet:`, error);
+    }
   }
 
   /**
@@ -659,7 +720,6 @@ class RingOfSpellStoring {
 
   /**
    * Add all ring spells to the spell list on character sheet
-   * @deprecated - Moving to item-centric design, this method is no longer used
    */
   static async addAllRingSpellsToSpellList(html, actor, rings, sheetType = 'unknown') {
     try {
