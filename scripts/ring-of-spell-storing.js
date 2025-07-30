@@ -65,14 +65,17 @@ class RingOfSpellStoring {
     // Hook into ready event
     Hooks.on('ready', this.onReady.bind(this));
 
-    // Hook into item sheet rendering to add ring spell management
-    // D&D 5e uses renderApplication for item sheets, not renderItemSheet
-    Hooks.on('renderApplication', this.onRenderItemSheet.bind(this));
-    console.log(`${MODULE_ID} | Registered hook: renderApplication`);
-
-    // Also register the standard hook for compatibility
+    // Hook into item sheet rendering - use multiple hooks for better compatibility
     Hooks.on('renderItemSheet', this.onRenderItemSheet.bind(this));
-    console.log(`${MODULE_ID} | Registered hook: renderItemSheet`);
+    Hooks.on('renderItemSheet5e', this.onRenderItemSheet.bind(this));
+    Hooks.on('renderApplication', (app, html, data) => {
+      // Only handle if it's an item sheet
+      if (app.document && app.document.documentName === 'Item') {
+        this.onRenderItemSheet(app, html, data);
+      }
+    });
+
+    console.log(`${MODULE_ID} | Registered item sheet hooks`);
 
     // Hook into actor sheet rendering to add ring spells to spell list
     // Register for multiple possible sheet types to ensure compatibility
@@ -98,7 +101,14 @@ class RingOfSpellStoring {
 
     // Hook into actor sheet context menus for inventory items
     Hooks.on('dnd5e.getItemContextOptions', this.onGetItemContextOptions.bind(this));
-    console.log(`${MODULE_ID} | Registered context menu hooks`);
+
+    // Also try the generic context menu hook
+    Hooks.on('getItemDirectoryEntryContext', this.onGetItemDirectoryContext.bind(this));
+
+    // Hook into actor sheet header buttons for toolbar access
+    Hooks.on('getActorSheetHeaderButtons', this.onGetActorSheetHeaderButtons.bind(this));
+
+    console.log(`${MODULE_ID} | Registered context menu and toolbar hooks`);
 
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
@@ -319,16 +329,20 @@ class RingOfSpellStoring {
       // Handle different hook signatures
       // renderApplication: sheet is the application, item is sheet.document or sheet.item
       // renderItemSheet: sheet is the item sheet, item is sheet.item
-      const item = sheet.document || sheet.item;
+      const item = sheet.document || sheet.item || sheet.object;
 
       if (!item) {
+        console.log(`${MODULE_ID} | onRenderItemSheet: No item found in sheet`);
         return; // Not an item sheet
       }
 
-      console.log(`${MODULE_ID} | onRenderItemSheet called for ${item.name} (type: ${item.type}, sheet: ${sheet.constructor.name})`);
+      console.log(`${MODULE_ID} | onRenderItemSheet called for "${item.name}" (type: ${item.type}, sheet: ${sheet.constructor.name})`);
 
       // Check if this is a Ring of Spell Storing
-      if (!this.isRingOfSpellStoring(item)) {
+      const isRing = this.isRingOfSpellStoring(item);
+      console.log(`${MODULE_ID} | Is Ring of Spell Storing: ${isRing}`);
+
+      if (!isRing) {
         return;
       }
 
@@ -336,15 +350,22 @@ class RingOfSpellStoring {
 
       // Check module setting
       const showInterface = game.settings.get(MODULE_ID, 'showInterface');
+      console.log(`${MODULE_ID} | Show interface setting: ${showInterface}`);
       if (!showInterface) {
         console.log(`${MODULE_ID} | Interface disabled in settings`);
         return;
       }
 
-      // Add spell management interface to the item sheet
-      this.addSpellManagementToItemSheet(html, item).catch(error => {
-        console.error(`${MODULE_ID} | Error adding spell management interface:`, error);
-      });
+      // Add header button for quick access
+      this.addRingHeaderButton(html, item);
+
+      // Add a small delay to ensure the sheet is fully rendered
+      setTimeout(() => {
+        console.log(`${MODULE_ID} | Adding spell management interface to ${item.name}`);
+        this.addSpellManagementToItemSheet(html, item).catch(error => {
+          console.error(`${MODULE_ID} | Error adding spell management interface:`, error);
+        });
+      }, 100);
 
     } catch (error) {
       console.error(`${MODULE_ID} | Error in onRenderItemSheet:`, error);
@@ -440,33 +461,43 @@ class RingOfSpellStoring {
     try {
       console.log(`${MODULE_ID} | Adding spell management interface to ${ring.name}`);
 
-      // Get ring data
-      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
+      // Get ring data - try multiple flag locations for compatibility
+      const ringData = ring.system.flags?.[MODULE_ID] || ring.flags?.[MODULE_ID] || { storedSpells: [] };
       const storedSpells = ringData.storedSpells || [];
-      const usedLevels = storedSpells.reduce((sum, spell) => sum + spell.level, 0);
+      const usedLevels = storedSpells.reduce((sum, spell) => sum + (spell.level || 0), 0);
       const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
 
-      // Find a good place to inject the interface
+      console.log(`${MODULE_ID} | Ring data:`, { storedSpells: storedSpells.length, usedLevels, remainingLevels });
+
+      // Find a good place to inject the interface - try multiple selectors
       const targetSelectors = [
-        '.tab[data-tab="details"]',  // D&D 5e default
-        '.tab[data-tab="description"]',
-        '.sheet-body',
-        '.window-content'
+        '.tab[data-tab="details"] .tab-body',  // D&D 5e v3+ details tab body
+        '.tab[data-tab="details"]',           // D&D 5e details tab
+        '.tab[data-tab="description"] .tab-body', // Description tab body
+        '.tab[data-tab="description"]',       // Description tab
+        '.sheet-body .tab.active',           // Active tab
+        '.sheet-body',                       // Sheet body
+        '.window-content form',              // Form content
+        '.window-content'                    // Window content
       ];
 
       let targetContainer = null;
       for (const selector of targetSelectors) {
         targetContainer = html.find(selector);
         if (targetContainer.length > 0) {
-          console.log(`${MODULE_ID} | Found target container: ${selector}`);
+          console.log(`${MODULE_ID} | Found target container: ${selector} (${targetContainer.length} elements)`);
           break;
         }
       }
 
       if (!targetContainer || targetContainer.length === 0) {
         console.warn(`${MODULE_ID} | No suitable container found for spell management interface`);
+        console.log(`${MODULE_ID} | Available elements:`, html.find('*').map((i, el) => el.tagName + (el.className ? '.' + el.className.replace(/\s+/g, '.') : '')).get());
         return;
       }
+
+      // Remove any existing ring management interface to prevent duplicates
+      html.find('.ring-spell-management').remove();
 
       // Create the spell management section
       const spellManagementSection = $(`
@@ -496,8 +527,8 @@ class RingOfSpellStoring {
     storedSpells.map((spell, index) => `
                   <div class="stored-spell-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: white; border-radius: 4px; border-left: 4px solid #4169e1;">
                     <div>
-                      <strong>${spell.name}</strong> (Level ${spell.level})
-                      <br><small style="color: #666;">Cast by: ${spell.originalCaster.name}</small>
+                      <strong>${spell.name || 'Unknown Spell'}</strong> (Level ${spell.level || 1})
+                      <br><small style="color: #666;">Cast by: ${spell.originalCaster?.name || 'Unknown'}</small>
                     </div>
                     <div style="display: flex; gap: 5px;">
                       <button class="cast-spell-btn" data-spell-index="${index}" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
@@ -528,12 +559,13 @@ class RingOfSpellStoring {
       this.attachItemSheetEventHandlers(spellManagementSection, ring);
 
       // Insert the section into the item sheet
-      targetContainer.append(spellManagementSection);
+      targetContainer.first().append(spellManagementSection);
 
-      console.log(`${MODULE_ID} | Successfully added spell management interface to ${ring.name}`);
+      console.log(`${MODULE_ID} | ✅ Successfully added spell management interface to ${ring.name}`);
 
     } catch (error) {
       console.error(`${MODULE_ID} | Error in addSpellManagementToItemSheet:`, error);
+      ui.notifications.error(`Failed to add spell management interface: ${error.message}`);
     }
   }
 
@@ -1404,7 +1436,14 @@ class RingOfSpellStoring {
       button.on('click', (event) => {
         event.preventDefault();
         console.log(`${MODULE_ID} | Opening ring interface for ${ring.name}`);
-        this.openRingInterface(actor, ring);
+
+        // Find the actor who owns this ring
+        const actor = ring.parent;
+        if (actor) {
+          this.openRingInterface(actor, ring);
+        } else {
+          ui.notifications.warn('Cannot open ring interface: ring is not owned by a character');
+        }
       });
 
       buttonContainer.append(button);
@@ -1847,6 +1886,65 @@ class RingOfSpellStoring {
     } catch (error) {
       console.error(`${MODULE_ID} | Error removing stored spell:`, error);
       ui.notifications.error('Failed to remove stored spell');
+    }
+  }
+
+  /**
+   * Add a header button to Ring of Spell Storing item sheets
+   */
+  static addRingHeaderButton(html, ring) {
+    try {
+      // Find the header buttons area
+      const headerSelectors = [
+        '.window-header .header-buttons',
+        '.sheet-header .header-buttons',
+        '.window-title',
+        '.sheet-title'
+      ];
+
+      let headerContainer = null;
+      for (const selector of headerSelectors) {
+        headerContainer = html.find(selector);
+        if (headerContainer.length > 0) {
+          break;
+        }
+      }
+
+      if (!headerContainer || headerContainer.length === 0) {
+        console.log(`${MODULE_ID} | No header container found for button`);
+        return;
+      }
+
+      // Remove existing button to prevent duplicates
+      html.find('.ring-management-header-btn').remove();
+
+      // Create header button
+      const headerButton = $(`
+        <a class="ring-management-header-btn" title="Manage Ring Spells" style="color: #4169e1; margin-left: 5px;">
+          <i class="fas fa-magic"></i>
+        </a>
+      `);
+
+      // Add click handler
+      headerButton.on('click', (event) => {
+        event.preventDefault();
+        console.log(`${MODULE_ID} | Header button clicked for ${ring.name}`);
+
+        // Find the actor who owns this ring
+        const actor = ring.parent;
+        if (actor) {
+          this.openRingInterface(actor, ring);
+        } else {
+          ui.notifications.warn('Cannot open ring interface: ring is not owned by a character');
+        }
+      });
+
+      // Add to header
+      headerContainer.first().append(headerButton);
+      console.log(`${MODULE_ID} | Added header button to ${ring.name}`);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error adding header button:`, error);
     }
   }
 }
