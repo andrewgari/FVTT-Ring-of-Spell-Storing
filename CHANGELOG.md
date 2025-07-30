@@ -1,3 +1,8 @@
+## [1.0.18] - 2025-07-30
+
+### Changes
+- Add quick fix test function for immediate verification%0A- Fix critical UI issue: restore missing character sheet hooks
+
 ## [1.0.17] - 2025-07-29
 
 ### Changes

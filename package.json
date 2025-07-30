@@ -1,6 +1,6 @@
 {
   "name": "ring-of-spell-storing",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "A comprehensive implementation of the Ring of Spell Storing magic item for D&D 5th Edition in Foundry VTT",
   "main": "scripts/ring-of-spell-storing.js",
   "type": "commonjs",
