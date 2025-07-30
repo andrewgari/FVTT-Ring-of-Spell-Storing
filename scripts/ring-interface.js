@@ -41,11 +41,34 @@ export class RingInterface extends Application {
 
     this.ring = freshRing; // Update our reference
 
-    const ringData = freshRing.system.flags?.[MODULE_ID] || { storedSpells: [] };
-    const storedSpells = ringData.storedSpells || [];
+    // Try multiple ways to get the stored spells data
+    let storedSpells = [];
 
-    console.log(`Fresh ring data from flags:`, ringData);
-    console.log(`Stored spells array:`, storedSpells);
+    // Method 1: Using getFlag (recommended for data stored with setFlag)
+    const flagData = freshRing.getFlag?.(MODULE_ID, 'storedSpells');
+    if (flagData && Array.isArray(flagData)) {
+      storedSpells = flagData;
+      console.log(`✅ Found stored spells via getFlag:`, storedSpells);
+    } else {
+      // Method 2: Check system.flags (legacy compatibility)
+      const systemFlagData = freshRing.system.flags?.[MODULE_ID];
+      if (systemFlagData?.storedSpells && Array.isArray(systemFlagData.storedSpells)) {
+        storedSpells = systemFlagData.storedSpells;
+        console.log(`✅ Found stored spells via system.flags:`, storedSpells);
+      } else {
+        // Method 3: Check direct flags (alternative location)
+        const directFlagData = freshRing.flags?.[MODULE_ID];
+        if (directFlagData?.storedSpells && Array.isArray(directFlagData.storedSpells)) {
+          storedSpells = directFlagData.storedSpells;
+          console.log(`✅ Found stored spells via direct flags:`, storedSpells);
+        } else {
+          console.log(`❌ No stored spells found in any location`);
+          storedSpells = [];
+        }
+      }
+    }
+
+    console.log(`Final stored spells array:`, storedSpells);
     console.log(`Number of stored spells: ${storedSpells.length}`);
     console.log(`Raw stored spells data:`, JSON.stringify(storedSpells, null, 2));
 
@@ -616,14 +639,15 @@ export class RingInterface extends Application {
     // Verify the spell was actually stored
     console.log(`=== POST-STORAGE VERIFICATION ===`);
     const verifyRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
-    const verifyData = verifyRing.system.flags?.[MODULE_ID];
-    console.log(`Verification ring data:`, verifyData);
-    console.log(`Verification stored spells:`, verifyData?.storedSpells);
-    console.log(`Verification spell count:`, verifyData?.storedSpells?.length || 0);
 
-    if (verifyData?.storedSpells?.length > 0) {
-      console.log(`✅ Spell storage verified - ${verifyData.storedSpells.length} spells in ring`);
-      verifyData.storedSpells.forEach((s, i) => {
+    // Use getFlag to verify the data (same method as getData)
+    const verifyStoredSpells = verifyRing.getFlag?.(MODULE_ID, 'storedSpells') || [];
+    console.log(`Verification stored spells via getFlag:`, verifyStoredSpells);
+    console.log(`Verification spell count:`, verifyStoredSpells.length);
+
+    if (verifyStoredSpells.length > 0) {
+      console.log(`✅ Spell storage verified - ${verifyStoredSpells.length} spells in ring`);
+      verifyStoredSpells.forEach((s, i) => {
         console.log(`  Spell ${i}: ${s.name} (Level ${s.level}) by ${s.originalCaster?.name}`);
       });
     } else {
