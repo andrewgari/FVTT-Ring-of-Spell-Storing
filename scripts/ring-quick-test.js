@@ -322,6 +322,72 @@ window.testRingFix = function() {
   return true;
 };
 
+// Test all item sheet hooks to see what's actually firing
+window.testAllItemHooks = function() {
+  console.log('=== TESTING ALL ITEM SHEET HOOKS ===');
+
+  const actor = detectCharacter(false);
+  if (!actor) {
+    console.error('❌ No character detected');
+    return false;
+  }
+
+  const api = game.modules.get('ring-of-spell-storing')?.api;
+  if (!api) {
+    console.error('❌ Module API not available');
+    return false;
+  }
+
+  const rings = api.findRingsOnActor(actor);
+  if (rings.length === 0) {
+    console.error('❌ No rings found');
+    return false;
+  }
+
+  const ring = rings[0];
+  console.log(`🔍 Testing with ring: ${ring.name} (ID: ${ring.id})`);
+
+  // Monitor ALL possible item sheet hooks
+  const hookNames = [
+    'renderItemSheet',
+    'renderItemSheet5e',
+    'renderDnd5eItemSheet',
+    'renderApplication',
+    'renderDocumentSheet'
+  ];
+
+  const hookIds = [];
+
+  hookNames.forEach(hookName => {
+    const hookId = Hooks.on(hookName, (sheet, html, data) => {
+      if (sheet.document?.id === ring.id || sheet.item?.id === ring.id) {
+        console.log(`🎯 HOOK FIRED: ${hookName}`);
+        console.log('   Sheet type:', sheet.constructor.name);
+        console.log('   Sheet ID:', sheet.id);
+        console.log('   Item ID:', sheet.document?.id || sheet.item?.id);
+        console.log('   Item name:', sheet.document?.name || sheet.item?.name);
+        console.log('   HTML length:', html?.length || 'No HTML');
+      }
+    });
+    hookIds.push({ name: hookName, id: hookId });
+  });
+
+  console.log(`📡 Monitoring ${hookNames.length} hooks...`);
+  console.log('🔄 Opening ring item sheet...');
+
+  ring.sheet.render(true);
+
+  // Clean up hooks after 10 seconds
+  setTimeout(() => {
+    hookIds.forEach(({ name, id }) => {
+      Hooks.off(name, id);
+    });
+    console.log('⏰ Hook monitoring completed');
+  }, 10000);
+
+  return true;
+};
+
 // Test item sheet hook specifically
 window.testItemSheetHook = function() {
   console.log('=== TESTING ITEM SHEET HOOK ===');
@@ -387,6 +453,42 @@ window.testItemSheetHook = function() {
   return true;
 };
 
+// Check what hooks are actually registered
+window.checkHookRegistration = function() {
+  console.log('=== CHECKING HOOK REGISTRATION ===');
+
+  const hookNames = [
+    'renderItemSheet',
+    'renderItemSheet5e',
+    'renderDnd5eItemSheet',
+    'renderActorSheet',
+    'renderApplication'
+  ];
+
+  hookNames.forEach(hookName => {
+    const hooks = Hooks._hooks[hookName] || [];
+    const ringHooks = hooks.filter(hook =>
+      hook.fn.toString().includes('ring-of-spell-storing') ||
+      hook.fn.toString().includes('onRenderItemSheet') ||
+      hook.fn.toString().includes('onRenderActorSheet')
+    );
+    console.log(`${hookName}: ${hooks.length} total hooks, ${ringHooks.length} ring-related`);
+
+    if (ringHooks.length > 0) {
+      ringHooks.forEach((hook, i) => {
+        console.log(`   Ring hook ${i + 1}: ${hook.fn.name || 'anonymous'}`);
+      });
+    }
+  });
+
+  // Also check if the module's hooks are properly bound
+  const module = game.modules.get('ring-of-spell-storing');
+  console.log('Module active:', module?.active);
+  console.log('Module API available:', !!module?.api);
+
+  return true;
+};
+
 console.log('🔧 Ring of Spell Storing Diagnostics Loaded!');
 console.log('📋 Available commands:');
 console.log('  🚀 testRingFix() - Quick test after applying the fix (enhanced character detection)');
@@ -395,6 +497,8 @@ console.log('  🎯 ringTestSelected() - Test with selected token');
 console.log('  📝 ringTestByName("Character Name") - Test with specific character by name');
 console.log('  🛠️  ringDiagnostics() - Advanced diagnostics');
 console.log('  🔧 testItemSheetHook() - Test if item sheet hook is working');
+console.log('  📡 testAllItemHooks() - Monitor all item sheet hooks');
+console.log('  🔍 checkHookRegistration() - Check what hooks are registered');
 console.log('');
 console.log('💡 Character Detection Priority:');
 console.log('  1. Selected token on canvas (highest priority)');
