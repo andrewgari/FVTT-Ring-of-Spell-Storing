@@ -1,3 +1,8 @@
+## [1.0.34] - 2025-07-30
+
+### Changes
+- Enhance ring data update process with additional logging for embedded document updates and alternative update approaches
+
 ## [1.0.33] - 2025-07-30
 
 ### Changes
