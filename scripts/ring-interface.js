@@ -572,10 +572,6 @@ export class RingInterface extends Application {
             }
           }
 
-          const immediateCheck = this.actor.items.get(this.ring.id);
-          console.log(`Immediate check - ring flags:`, immediateCheck?.system?.flags);
-          console.log(`Immediate check - ring MODULE_ID data:`, immediateCheck?.system?.flags?.[MODULE_ID]);
-
         } else {
           // Ring is a world item, update directly
           console.log(`Updating ring directly (world item)...`);
@@ -590,6 +586,43 @@ export class RingInterface extends Application {
         if (!updateResult) {
           throw new Error('Update operation returned null or undefined');
         }
+
+        // Comprehensive debugging
+        console.log('Waiting for update to propagate...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        console.log('=== FRESH DATA RETRIEVAL ===');
+        const freshActor = game.actors.get(this.actor.id);
+        const freshRing = freshActor?.items?.get(this.ring.id);
+        console.log('Fresh actor:', freshActor?.name);
+        console.log('Fresh ring:', freshRing?.name);
+        console.log('Fresh ring system.flags:', freshRing?.system?.flags);
+        console.log('Fresh ring flags[MODULE_ID]:', freshRing?.system?.flags?.[MODULE_ID]);
+
+        // Try multiple ways to get the data
+        const flagData1 = freshRing?.system?.flags?.[MODULE_ID];
+        const flagData2 = freshRing?.getFlag?.(MODULE_ID, 'storedSpells');
+        const flagData3 = freshRing?.flags?.[MODULE_ID];
+
+        console.log('Method 1 (system.flags):', flagData1);
+        console.log('Method 2 (getFlag):', flagData2);
+        console.log('Method 3 (direct flags):', flagData3);
+
+        // Check if the data exists anywhere
+        if (flagData1?.storedSpells?.length > 0) {
+          console.log('✅ Data found via system.flags!');
+          console.log('Stored spells:', flagData1.storedSpells);
+        } else if (flagData2?.length > 0) {
+          console.log('✅ Data found via getFlag!');
+          console.log('Stored spells:', flagData2);
+        } else if (flagData3?.storedSpells?.length > 0) {
+          console.log('✅ Data found via direct flags!');
+          console.log('Stored spells:', flagData3.storedSpells);
+        } else {
+          console.log('❌ No data found in any location');
+        }
+        console.log('=== END FRESH DATA RETRIEVAL ===');
+
       }
     } catch (error) {
       console.error(`Ring update failed:`, error);
@@ -608,52 +641,7 @@ export class RingInterface extends Application {
       return false;
     }
 
-    // Wait a moment for the update to propagate
-    console.log('Waiting for update to propagate...');
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Force a fresh retrieval of the ring data
-    console.log('=== FRESH DATA RETRIEVAL ===');
-    const freshActor = game.actors.get(this.actor.id);
-    const freshRing = freshActor?.items?.get(this.ring.id);
-    console.log('Fresh actor:', freshActor?.name);
-    console.log('Fresh ring:', freshRing?.name);
-    console.log('Fresh ring system.flags:', freshRing?.system?.flags);
-    console.log('Fresh ring flags[MODULE_ID]:', freshRing?.system?.flags?.[MODULE_ID]);
-
-    // Try multiple ways to get the data
-    const flagData1 = freshRing?.system?.flags?.[MODULE_ID];
-    const flagData2 = freshRing?.getFlag?.(MODULE_ID, 'storedSpells');
-    const flagData3 = freshRing?.flags?.[MODULE_ID];
-
-    console.log('Method 1 (system.flags):', flagData1);
-    console.log('Method 2 (getFlag):', flagData2);
-    console.log('Method 3 (direct flags):', flagData3);
-
-    // Check if the data exists anywhere
-    if (flagData1?.storedSpells?.length > 0) {
-      console.log('✅ Data found via system.flags!');
-      console.log('Stored spells:', flagData1.storedSpells);
-    } else if (flagData2?.length > 0) {
-      console.log('✅ Data found via getFlag!');
-      console.log('Stored spells:', flagData2);
-    } else if (flagData3?.storedSpells?.length > 0) {
-      console.log('✅ Data found via direct flags!');
-      console.log('Stored spells:', flagData3.storedSpells);
-    } else {
-      console.log('❌ No data found in any location');
-    }
-    console.log('=== END FRESH DATA RETRIEVAL ===');
-
-    ui.notifications.info(
-      game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellStored', {
-        spell: spell.name,
-        level: level,
-        caster: casterActor.name
-      })
-    );
-
-    // Debug: Verify the spell was actually stored
+    // Verify the spell was actually stored
     console.log(`=== POST-STORAGE VERIFICATION ===`);
     const verifyRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
     const verifyData = verifyRing.system.flags?.[MODULE_ID];
