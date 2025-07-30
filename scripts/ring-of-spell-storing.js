@@ -419,24 +419,24 @@ class RingOfSpellStoring {
    */
   static getRingSpellData(ring) {
     try {
-      // Try multiple locations for compatibility
+      // Try multiple locations for compatibility with ring-interface.js
       let flagData = null;
 
-      // Method 1: Direct flag access
-      flagData = ring.getFlag(MODULE_ID, 'storedSpells');
-      if (flagData && Array.isArray(flagData)) {
-        console.log(`${MODULE_ID} | Found spell data via getFlag:`, flagData.length, 'spells');
-        return flagData;
-      }
-
-      // Method 2: System flags
+      // Method 1: System flags (primary method used by ring-interface.js)
       flagData = ring.system.flags?.[MODULE_ID]?.storedSpells;
       if (flagData && Array.isArray(flagData)) {
         console.log(`${MODULE_ID} | Found spell data via system.flags:`, flagData.length, 'spells');
         return flagData;
       }
 
-      // Method 3: Item flags
+      // Method 2: Direct flag access (fallback)
+      flagData = ring.getFlag(MODULE_ID, 'storedSpells');
+      if (flagData && Array.isArray(flagData)) {
+        console.log(`${MODULE_ID} | Found spell data via getFlag:`, flagData.length, 'spells');
+        return flagData;
+      }
+
+      // Method 3: Item flags (alternative location)
       flagData = ring.flags?.[MODULE_ID]?.storedSpells;
       if (flagData && Array.isArray(flagData)) {
         console.log(`${MODULE_ID} | Found spell data via flags:`, flagData.length, 'spells');
@@ -461,15 +461,30 @@ class RingOfSpellStoring {
       // Ensure spellData is an array
       const spellArray = Array.isArray(spellData) ? spellData : [];
 
-      // Update using the flag system
-      await ring.setFlag(MODULE_ID, 'storedSpells', spellArray);
-
-      // Also update the system flags for compatibility
-      const updateData = {
-        [`system.flags.${MODULE_ID}.storedSpells`]: spellArray
+      // Create the ring data structure that matches ring-interface.js expectations
+      const ringData = {
+        storedSpells: spellArray
       };
 
-      await ring.update(updateData);
+      // Determine the correct update method based on ring ownership
+      if (ring.parent) {
+        // Ring is owned by actor, update through actor (embedded document)
+        console.log(`${MODULE_ID} | Updating ring through actor (embedded document)...`);
+
+        const embeddedUpdateData = {
+          _id: ring.id,
+          [`system.flags.${MODULE_ID}`]: ringData
+        };
+
+        await ring.parent.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
+      } else {
+        // Ring is a world item, update directly
+        console.log(`${MODULE_ID} | Updating ring directly (world item)...`);
+        const updateData = {
+          [`system.flags.${MODULE_ID}`]: ringData
+        };
+        await ring.update(updateData);
+      }
 
       console.log(`${MODULE_ID} | Successfully updated spell data for ${ring.name}`);
       return true;
@@ -510,7 +525,7 @@ class RingOfSpellStoring {
       }
 
       // Get ring data - try multiple flag locations for compatibility
-      const ringData = ring.system.flags?.[MODULE_ID] || ring.flags?.[MODULE_ID] || { storedSpells: [] };
+      const ringData = ring.system.flags?.[MODULE_ID] || { storedSpells: [] };
       const storedSpells = ringData.storedSpells || [];
       const usedLevels = storedSpells.reduce((sum, s) => sum + s.level, 0);
       const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
