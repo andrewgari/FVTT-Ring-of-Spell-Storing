@@ -489,6 +489,53 @@ window.checkHookRegistration = function() {
   return true;
 };
 
+// Test the new context menu system
+window.testContextMenu = function() {
+  console.log('=== TESTING CONTEXT MENU SYSTEM ===');
+
+  const actor = detectCharacter(false);
+  if (!actor) {
+    console.error('❌ No character detected');
+    return false;
+  }
+
+  const api = game.modules.get('ring-of-spell-storing')?.api;
+  if (!api) {
+    console.error('❌ Module API not available');
+    return false;
+  }
+
+  const rings = api.findRingsOnActor(actor);
+  if (rings.length === 0) {
+    console.error('❌ No rings found');
+    return false;
+  }
+
+  const ring = rings[0];
+  console.log(`🔍 Testing context menu with ring: ${ring.name}`);
+
+  // Test the context menu methods directly
+  console.log('📋 Testing showRingContents...');
+  api.showRingContents(ring);
+
+  setTimeout(() => {
+    console.log('🔮 Testing openRingManagementDialog...');
+    api.openRingManagementDialog(ring);
+  }, 2000);
+
+  setTimeout(() => {
+    console.log('📥 Testing openStoreSpellDialog...');
+    api.openStoreSpellDialog(ring);
+  }, 4000);
+
+  console.log('✅ Context menu test initiated!');
+  console.log('   - Ring contents dialog should open immediately');
+  console.log('   - Management dialog should open in 2 seconds');
+  console.log('   - Store spell dialog should open in 4 seconds');
+
+  return true;
+};
+
 console.log('🔧 Ring of Spell Storing Diagnostics Loaded!');
 console.log('📋 Available commands:');
 console.log('  🚀 testRingFix() - Quick test after applying the fix (enhanced character detection)');
@@ -499,6 +546,7 @@ console.log('  🛠️  ringDiagnostics() - Advanced diagnostics');
 console.log('  🔧 testItemSheetHook() - Test if item sheet hook is working');
 console.log('  📡 testAllItemHooks() - Monitor all item sheet hooks');
 console.log('  🔍 checkHookRegistration() - Check what hooks are registered');
+console.log('  🎯 testContextMenu() - Test the new context menu system');
 console.log('');
 console.log('💡 Character Detection Priority:');
 console.log('  1. Selected token on canvas (highest priority)');
