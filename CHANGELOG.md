@@ -1,3 +1,8 @@
+## [1.0.37] - 2025-07-30
+
+### Changes
+- Refactor ring data update process to utilize setFlag method and improve error handling during updates
+
 ## [1.0.36] - 2025-07-30
 
 ### Changes
