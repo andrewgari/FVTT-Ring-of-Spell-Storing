@@ -3,6 +3,73 @@
  * Run this in the browser console to diagnose issues
  */
 
+// Enhanced character detection function
+function detectCharacter(verbose = true) {
+  if (verbose) {
+    console.log('🔍 Detecting character using multiple methods...');
+  }
+
+  const methods = [];
+  let actor = null;
+
+  // Method 1: Selected token (highest priority for active gameplay)
+  const selectedTokens = canvas.tokens?.controlled || [];
+  if (selectedTokens.length > 0 && selectedTokens[0].actor) {
+    methods.push(`✅ Selected token: ${selectedTokens[0].actor.name}`);
+    actor = actor || selectedTokens[0].actor;
+  } else {
+    methods.push('❌ No token selected');
+  }
+
+  // Method 2: Assigned character
+  if (game.user.character) {
+    methods.push(`✅ Assigned character: ${game.user.character.name}`);
+    actor = actor || game.user.character;
+  } else {
+    methods.push('❌ No assigned character');
+  }
+
+  // Method 3: Open character sheet
+  const openSheets = Object.values(ui.windows).filter(w =>
+    w.constructor.name.includes('ActorSheet') && w.actor?.type === 'character'
+  );
+  if (openSheets.length > 0) {
+    methods.push(`✅ Open character sheet: ${openSheets[0].actor.name}`);
+    actor = actor || openSheets[0].actor;
+  } else {
+    methods.push('❌ No character sheet open');
+  }
+
+  // Method 4: First owned character (fallback)
+  const ownedCharacters = game.actors.filter(a =>
+    a.type === 'character' && a.isOwner
+  );
+  if (ownedCharacters.length > 0) {
+    methods.push(`✅ First owned character: ${ownedCharacters[0].name}`);
+    actor = actor || ownedCharacters[0];
+  } else {
+    methods.push('❌ No owned characters');
+  }
+
+  // Log all detection methods if verbose
+  if (verbose) {
+    methods.forEach(method => console.log(`   ${method}`));
+
+    if (actor) {
+      console.log(`🎯 Using character: ${actor.name} (ID: ${actor.id})`);
+    } else {
+      console.log('❌ No character could be detected by any method');
+      console.log('💡 Try one of these solutions:');
+      console.log('   • Select a character token on the canvas');
+      console.log('   • Open a character sheet');
+      console.log('   • Set a default character in your user settings');
+      console.log('   • Run: ringTestByName("Your Character Name")');
+    }
+  }
+
+  return actor;
+}
+
 // Quick diagnostic function you can run in the console
 window.ringQuickTest = function(targetActor = null) {
   console.log('=== RING OF SPELL STORING QUICK TEST (ITEM-CENTRIC) ===');
@@ -28,33 +95,12 @@ window.ringQuickTest = function(targetActor = null) {
     return false;
   }
 
-  // 3. Get target character (Priority: provided actor > selected token > assigned character)
-  let actor = targetActor;
+  // 3. Detect character using enhanced logic
+  const actor = targetActor || detectCharacter();
+  console.log('3. Character detection result:', actor?.name || 'Failed');
 
   if (!actor) {
-    // Try selected token first (for GMs)
-    const selectedToken = canvas.tokens.controlled[0];
-    if (selectedToken?.actor) {
-      actor = selectedToken.actor;
-      console.log('3. Using selected token:', actor.name);
-    } else {
-      // Fall back to assigned character
-      actor = game.user.character;
-      console.log('3. Using assigned character:', actor?.name || 'None');
-    }
-  } else {
-    console.log('3. Using provided actor:', actor.name);
-  }
-
-  if (!actor) {
-    console.error('❌ No character available! Please:');
-    console.error('   - Select a character token on the canvas, OR');
-    console.error('   - Set an assigned character, OR');
-    console.error('   - Run ringQuickTest(actorObject) with a specific actor');
-    console.log('💡 Available characters:');
-    game.actors.filter(a => a.type === 'character').forEach((char, i) => {
-      console.log(`   ${i}: ${char.name} (ID: ${char.id})`);
-    });
+    console.error('❌ No character could be detected!');
     return false;
   }
 
@@ -183,9 +229,15 @@ async function createTestRing(actor, _api) {
 
 // Also make the diagnostics available globally
 window.ringDiagnostics = function(actor = null) {
+  const targetActor = actor || detectCharacter();
+  if (!targetActor) {
+    console.error('❌ No character available for diagnostics');
+    return false;
+  }
+
   const module = game.modules.get('ring-of-spell-storing');
   if (module?.api?.runDiagnostics) {
-    return module.api.runDiagnostics(actor);
+    return module.api.runDiagnostics(targetActor);
   } else {
     console.error('Ring diagnostics not available');
     return false;
@@ -220,38 +272,66 @@ window.ringTestSelected = function() {
 window.testRingFix = function() {
   console.log('=== TESTING RING FIX ===');
 
-  const actor = game.user.character;
+  // Use enhanced character detection
+  const actor = detectCharacter();
   if (!actor) {
-    console.error('No character selected');
+    console.error('❌ No character could be detected!');
     return false;
   }
 
   const module = game.modules.get('ring-of-spell-storing');
   if (!module?.active) {
-    console.error('Module not active');
+    console.error('❌ Module not active! Enable it in module settings.');
+    return false;
+  }
+
+  console.log(`🎯 Testing with character: ${actor.name}`);
+
+  // Check if character has rings
+  const rings = module.api?.findRingsOnActor?.(actor) || [];
+  console.log(`🔍 Found ${rings.length} rings on ${actor.name}`);
+
+  if (rings.length === 0) {
+    console.warn('⚠️ No rings found on this character.');
+    console.log('💡 Make sure you have a "Ring of Spell Storing" item that is equipped and attuned.');
     return false;
   }
 
   // Force re-render the character sheet
   if (actor.sheet.rendered) {
-    console.log('Re-rendering character sheet...');
+    console.log('🔄 Re-rendering character sheet...');
     actor.sheet.render(false);
 
     setTimeout(() => {
       console.log('✅ Sheet re-rendered! Check your Spells tab for ring sections.');
-      console.log('If you still don\'t see anything, run ringQuickTest() for full diagnostics.');
+      console.log('📋 You should see:');
+      rings.forEach((ring, i) => {
+        console.log(`   • Ring ${i + 1}: ${ring.name} with "Manage" button`);
+      });
+      console.log('❓ If you still don\'t see anything, run ringQuickTest() for full diagnostics.');
     }, 500);
   } else {
-    console.log('Opening character sheet...');
+    console.log('📖 Opening character sheet...');
     actor.sheet.render(true);
+
+    setTimeout(() => {
+      console.log('✅ Character sheet opened! Check your Spells tab for ring sections.');
+    }, 500);
   }
 
   return true;
 };
 
-console.log('Ring Quick Test loaded!');
-console.log('Available commands:');
-console.log('  testRingFix() - Quick test after applying the fix');
-console.log('  ringQuickTest() - Auto-detect character (selected token > assigned character)');
-console.log('  ringTestSelected() - Test with selected token');
-console.log('  ringTestByName("Character Name") - Test with specific character by name');
+console.log('🔧 Ring of Spell Storing Diagnostics Loaded!');
+console.log('📋 Available commands:');
+console.log('  🚀 testRingFix() - Quick test after applying the fix (enhanced character detection)');
+console.log('  🔍 ringQuickTest() - Full diagnostic with auto-detect character');
+console.log('  🎯 ringTestSelected() - Test with selected token');
+console.log('  📝 ringTestByName("Character Name") - Test with specific character by name');
+console.log('  🛠️  ringDiagnostics() - Advanced diagnostics');
+console.log('');
+console.log('💡 Character Detection Priority:');
+console.log('  1. Selected token on canvas (highest priority)');
+console.log('  2. Assigned character in user settings');
+console.log('  3. Open character sheet');
+console.log('  4. First owned character (fallback)');
