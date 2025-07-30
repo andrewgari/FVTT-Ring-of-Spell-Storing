@@ -28,10 +28,17 @@ export class RingInterface extends Application {
   getData() {
     console.log(`=== RingInterface.getData() called ===`);
     console.log(`Ring ID: ${this.ring.id}`);
+    console.log(`Ring name: ${this.ring.name}`);
+    console.log(`Ring parent: ${this.ring.parent?.name || 'No parent'}`);
     console.log(`Ring flags:`, this.ring.system.flags);
+    console.log(`Ring system:`, this.ring.system);
 
     // Get fresh ring data to ensure we have the latest information
     const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
+    console.log(`Fresh ring retrieved:`, freshRing.name);
+    console.log(`Fresh ring flags:`, freshRing.system.flags);
+    console.log(`Fresh ring MODULE_ID data:`, freshRing.system.flags?.[MODULE_ID]);
+
     this.ring = freshRing; // Update our reference
 
     const ringData = freshRing.system.flags?.[MODULE_ID] || { storedSpells: [] };
@@ -40,6 +47,7 @@ export class RingInterface extends Application {
     console.log(`Fresh ring data from flags:`, ringData);
     console.log(`Stored spells array:`, storedSpells);
     console.log(`Number of stored spells: ${storedSpells.length}`);
+    console.log(`Raw stored spells data:`, JSON.stringify(storedSpells, null, 2));
 
     // Validate stored spells data integrity
     const validStoredSpells = storedSpells.filter(spell => {
@@ -77,6 +85,8 @@ export class RingInterface extends Application {
 
     console.log(`Template data being returned:`, templateData);
     console.log(`Valid stored spells count: ${validStoredSpells.length}`);
+    console.log(`Template storedSpells:`, templateData.storedSpells);
+    console.log(`Template storedSpells length:`, templateData.storedSpells.length);
     console.log(`=== End getData() ===`);
 
     return templateData;
@@ -610,6 +620,24 @@ export class RingInterface extends Application {
         caster: casterActor.name
       })
     );
+
+    // Debug: Verify the spell was actually stored
+    console.log(`=== POST-STORAGE VERIFICATION ===`);
+    const verifyRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
+    const verifyData = verifyRing.system.flags?.[MODULE_ID];
+    console.log(`Verification ring data:`, verifyData);
+    console.log(`Verification stored spells:`, verifyData?.storedSpells);
+    console.log(`Verification spell count:`, verifyData?.storedSpells?.length || 0);
+
+    if (verifyData?.storedSpells?.length > 0) {
+      console.log(`✅ Spell storage verified - ${verifyData.storedSpells.length} spells in ring`);
+      verifyData.storedSpells.forEach((s, i) => {
+        console.log(`  Spell ${i}: ${s.name} (Level ${s.level}) by ${s.originalCaster?.name}`);
+      });
+    } else {
+      console.error(`❌ Spell storage verification failed - no spells found in ring`);
+    }
+    console.log(`=== END POST-STORAGE VERIFICATION ===`);
 
     // Force a complete re-render of the interface
     console.log(`Forcing interface re-render`);
