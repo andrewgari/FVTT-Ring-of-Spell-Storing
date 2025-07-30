@@ -92,6 +92,14 @@ class RingOfSpellStoring {
     // Hook into actor data preparation to inject ring spells
     Hooks.on('dnd5e.prepareActorData', this.onPrepareActorData.bind(this));
 
+    // Hook into context menu for inventory items
+    Hooks.on('getItemDirectoryEntryContext', this.onGetItemContext.bind(this));
+    Hooks.on('getActorSheetHeaderButtons', this.onGetActorSheetHeaderButtons.bind(this));
+
+    // Hook into actor sheet context menus for inventory items
+    Hooks.on('dnd5e.getItemContextOptions', this.onGetItemContextOptions.bind(this));
+    console.log(`${MODULE_ID} | Registered context menu hooks`);
+
     // Hook into item usage
     Hooks.on('dnd5e.useItem', this.onUseItem.bind(this));
 
@@ -130,6 +138,18 @@ class RingOfSpellStoring {
       // Item-centric methods
       isRingOfSpellStoring: this.isRingOfSpellStoring.bind(this),
       addSpellManagementToItemSheet: this.addSpellManagementToItemSheet.bind(this),
+      // Context menu methods
+      openRingManagementDialog: this.openRingManagementDialog.bind(this),
+      openStoreSpellDialog: this.openStoreSpellDialog.bind(this),
+      showRingContents: this.showRingContents.bind(this),
+      storeSpellFromDialog: this.storeSpellFromDialog.bind(this),
+      castStoredSpell: this.castStoredSpell.bind(this),
+      removeStoredSpell: this.removeStoredSpell.bind(this),
+      // Ring data management
+      getRingSpellData: this.getRingSpellData.bind(this),
+      setRingSpellData: this.setRingSpellData.bind(this),
+      calculateUsedLevels: this.calculateUsedLevels.bind(this),
+      hasCapacity: this.hasCapacity.bind(this),
       // Diagnostic methods
       runDiagnostics: RingDiagnostics.diagnoseCharacterSheetIntegration.bind(RingDiagnostics),
       checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics),
@@ -235,6 +255,50 @@ class RingOfSpellStoring {
   }
 
   /**
+   * Handle context menu options for items in character sheets
+   */
+  static onGetItemContextOptions(item, contextOptions) {
+    try {
+      // Only add context menu for Ring of Spell Storing
+      if (!this.isRingOfSpellStoring(item)) {
+        return contextOptions;
+      }
+
+      console.log(`${MODULE_ID} | Adding context menu options for ${item.name}`);
+
+      // Add ring management options to the context menu
+      const ringOptions = [
+        {
+          name: '🔮 Manage Stored Spells',
+          icon: '<i class="fas fa-magic"></i>',
+          condition: () => true,
+          callback: () => this.openRingManagementDialog(item)
+        },
+        {
+          name: '📥 Store New Spell',
+          icon: '<i class="fas fa-plus-circle"></i>',
+          condition: () => true,
+          callback: () => this.openStoreSpellDialog(item)
+        },
+        {
+          name: '📋 View Ring Contents',
+          icon: '<i class="fas fa-list"></i>',
+          condition: () => true,
+          callback: () => this.showRingContents(item)
+        }
+      ];
+
+      // Insert ring options at the beginning of the context menu
+      contextOptions.unshift(...ringOptions);
+
+      return contextOptions;
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error in onGetItemContextOptions:`, error);
+      return contextOptions;
+    }
+  }
+
+  /**
    * Handle item sheet rendering to add ring spell management interface
    * This handles both renderItemSheet and renderApplication hooks
    */
@@ -300,6 +364,44 @@ class RingOfSpellStoring {
     }
 
     return false;
+  }
+
+  /**
+   * Get stored spells data from a ring using Foundry's flag system
+   */
+  static getRingSpellData(ring) {
+    const flagData = ring.getFlag(MODULE_ID, 'storedSpells') || [];
+    return Array.isArray(flagData) ? flagData : [];
+  }
+
+  /**
+   * Set stored spells data on a ring using Foundry's flag system
+   */
+  static async setRingSpellData(ring, spellData) {
+    try {
+      await ring.setFlag(MODULE_ID, 'storedSpells', spellData);
+      console.log(`${MODULE_ID} | Updated spell data for ${ring.name}:`, spellData);
+      return true;
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error setting ring spell data:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Calculate used spell levels in a ring
+   */
+  static calculateUsedLevels(ring) {
+    const storedSpells = this.getRingSpellData(ring);
+    return storedSpells.reduce((total, spell) => total + (spell.level || 0), 0);
+  }
+
+  /**
+   * Check if a ring has capacity for a new spell
+   */
+  static hasCapacity(ring, spellLevel) {
+    const usedLevels = this.calculateUsedLevels(ring);
+    return (usedLevels + spellLevel) <= MAX_SPELL_LEVELS;
   }
 
   /**
@@ -1386,6 +1488,342 @@ class RingOfSpellStoring {
 
     console.log(`${MODULE_ID} | Testing UI injection with: ${actor.name}`);
     return this.testUIInjection(actor);
+  }
+
+  /**
+   * Open the ring management dialog
+   */
+  static async openRingManagementDialog(ring) {
+    try {
+      console.log(`${MODULE_ID} | Opening management dialog for ${ring.name}`);
+
+      const storedSpells = this.getRingSpellData(ring);
+      const usedLevels = this.calculateUsedLevels(ring);
+      const remainingLevels = MAX_SPELL_LEVELS - usedLevels;
+
+      // Create dialog content
+      let content = `
+        <div class="ring-management-dialog">
+          <h3>🔮 ${ring.name}</h3>
+          <div class="capacity-info">
+            <p><strong>Capacity:</strong> ${usedLevels}/${MAX_SPELL_LEVELS} spell levels used</p>
+            <p><strong>Remaining:</strong> ${remainingLevels} spell levels available</p>
+          </div>
+          <hr>
+          <h4>Stored Spells:</h4>
+      `;
+
+      if (storedSpells.length === 0) {
+        content += '<p><em>No spells currently stored in this ring.</em></p>';
+      } else {
+        content += '<div class="stored-spells-list">';
+        storedSpells.forEach((spell, index) => {
+          content += `
+            <div class="stored-spell" data-spell-index="${index}">
+              <div class="spell-info">
+                <strong>${spell.name}</strong> (Level ${spell.level})
+                <br><small>Caster: ${spell.originalCaster} | DC: ${spell.spellSaveDC}</small>
+              </div>
+              <div class="spell-actions">
+                <button type="button" class="cast-spell-btn" data-spell-index="${index}">
+                  <i class="fas fa-magic"></i> Cast
+                </button>
+                <button type="button" class="remove-spell-btn" data-spell-index="${index}">
+                  <i class="fas fa-trash"></i> Remove
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        content += '</div>';
+      }
+
+      content += `
+          <hr>
+          <div class="dialog-actions">
+            <button type="button" class="store-new-spell-btn">
+              <i class="fas fa-plus-circle"></i> Store New Spell
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Create and show dialog
+      new Dialog({
+        title: `Ring Management: ${ring.name}`,
+        content: content,
+        buttons: {
+          close: {
+            label: 'Close',
+            callback: () => {}
+          }
+        },
+        render: (html) => {
+          // Attach event handlers
+          html.find('.cast-spell-btn').click((event) => {
+            const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
+            this.castStoredSpell(ring, spellIndex);
+          });
+
+          html.find('.remove-spell-btn').click((event) => {
+            const spellIndex = parseInt(event.currentTarget.dataset.spellIndex);
+            this.removeStoredSpell(ring, spellIndex);
+          });
+
+          html.find('.store-new-spell-btn').click(() => {
+            this.openStoreSpellDialog(ring);
+          });
+        },
+        default: 'close'
+      }).render(true);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error opening ring management dialog:`, error);
+      ui.notifications.error('Failed to open ring management dialog');
+    }
+  }
+
+  /**
+   * Open dialog to store a new spell in the ring
+   */
+  static async openStoreSpellDialog(ring) {
+    try {
+      const actor = ring.parent;
+      if (!actor) {
+        ui.notifications.error('Ring must be owned by a character to store spells');
+        return;
+      }
+
+      // Get available spells from the actor
+      const availableSpells = actor.items.filter(item =>
+        item.type === 'spell' && item.system.level <= 5
+      );
+
+      if (availableSpells.length === 0) {
+        ui.notifications.warn('No spells available to store (only spells of level 1-5 can be stored)');
+        return;
+      }
+
+      // Create spell selection content
+      let content = `
+        <div class="store-spell-dialog">
+          <h3>📥 Store Spell in ${ring.name}</h3>
+          <p>Select a spell to store in the ring:</p>
+          <select id="spell-select" style="width: 100%; margin: 10px 0;">
+            <option value="">-- Select a Spell --</option>
+      `;
+
+      availableSpells.forEach(spell => {
+        const level = spell.system.level;
+        // const usedLevels = this.calculateUsedLevels(ring);
+        const canStore = this.hasCapacity(ring, level);
+        const disabled = canStore ? '' : 'disabled';
+
+        content += `
+          <option value="${spell.id}" ${disabled}>
+            ${spell.name} (Level ${level}) ${canStore ? '' : '- No Capacity'}
+          </option>
+        `;
+      });
+
+      content += `
+          </select>
+          <div class="capacity-warning" style="margin: 10px 0; padding: 8px; background: #fff3cd; border-radius: 4px;">
+            <small><strong>Note:</strong> Ring capacity is ${MAX_SPELL_LEVELS} spell levels total.</small>
+          </div>
+        </div>
+      `;
+
+      new Dialog({
+        title: 'Store Spell',
+        content: content,
+        buttons: {
+          store: {
+            label: 'Store Spell',
+            callback: (html) => {
+              const spellId = html.find('#spell-select').val();
+              if (spellId) {
+                this.storeSpellFromDialog(ring, spellId);
+              } else {
+                ui.notifications.warn('Please select a spell to store');
+              }
+            }
+          },
+          cancel: {
+            label: 'Cancel',
+            callback: () => {}
+          }
+        },
+        default: 'store'
+      }).render(true);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error opening store spell dialog:`, error);
+      ui.notifications.error('Failed to open store spell dialog');
+    }
+  }
+
+  /**
+   * Show ring contents in a simple dialog
+   */
+  static showRingContents(ring) {
+    const storedSpells = this.getRingSpellData(ring);
+    const usedLevels = this.calculateUsedLevels(ring);
+
+    let content = `
+      <div class="ring-contents">
+        <h3>📋 ${ring.name} Contents</h3>
+        <p><strong>Capacity:</strong> ${usedLevels}/${MAX_SPELL_LEVELS} spell levels used</p>
+        <hr>
+    `;
+
+    if (storedSpells.length === 0) {
+      content += '<p><em>This ring contains no stored spells.</em></p>';
+    } else {
+      content += '<ul>';
+      storedSpells.forEach(spell => {
+        content += `
+          <li>
+            <strong>${spell.name}</strong> (Level ${spell.level})
+            <br><small>Original Caster: ${spell.originalCaster} | Spell Save DC: ${spell.spellSaveDC}</small>
+          </li>
+        `;
+      });
+      content += '</ul>';
+    }
+
+    content += '</div>';
+
+    new Dialog({
+      title: `Ring Contents: ${ring.name}`,
+      content: content,
+      buttons: {
+        close: {
+          label: 'Close',
+          callback: () => {}
+        }
+      },
+      default: 'close'
+    }).render(true);
+  }
+
+  /**
+   * Store a spell in the ring from dialog
+   */
+  static async storeSpellFromDialog(ring, spellId) {
+    try {
+      const actor = ring.parent;
+      const spell = actor.items.get(spellId);
+
+      if (!spell) {
+        ui.notifications.error('Spell not found');
+        return;
+      }
+
+      const spellLevel = spell.system.level;
+
+      if (!this.hasCapacity(ring, spellLevel)) {
+        ui.notifications.error(`Ring does not have capacity for a level ${spellLevel} spell`);
+        return;
+      }
+
+      // Create spell data for storage
+      const spellData = {
+        id: spell.id,
+        name: spell.name,
+        level: spellLevel,
+        originalCaster: actor.name,
+        casterId: actor.id,
+        spellSaveDC: actor.system.attributes.spelldc || 10,
+        spellAttackBonus: actor.system.attributes.spellmod || 0,
+        castingAbility: actor.system.attributes.spellcasting || 'int',
+        storedAt: Date.now(),
+        spellData: foundry.utils.duplicate(spell.system) // Store full spell data
+      };
+
+      // Add to stored spells
+      const storedSpells = this.getRingSpellData(ring);
+      storedSpells.push(spellData);
+
+      await this.setRingSpellData(ring, storedSpells);
+
+      ui.notifications.info(`${spell.name} has been stored in ${ring.name}`);
+      console.log(`${MODULE_ID} | Stored spell ${spell.name} in ${ring.name}`);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error storing spell in ring:`, error);
+      ui.notifications.error('Failed to store spell in ring');
+    }
+  }
+
+  /**
+   * Cast a stored spell from the ring
+   */
+  static async castStoredSpell(ring, spellIndex) {
+    try {
+      const storedSpells = this.getRingSpellData(ring);
+      const spell = storedSpells[spellIndex];
+
+      if (!spell) {
+        ui.notifications.error('Spell not found in ring');
+        return;
+      }
+
+      // Note: In a full implementation, you would create a temporary spell item
+      // and use the original caster's stats for the actual spell casting
+      // For now, we just show the notification and remove the spell
+
+      ui.notifications.info(`Casting ${spell.name} from ${ring.name} (using ${spell.originalCaster}'s stats)`);
+
+      // Remove the spell from the ring after casting
+      storedSpells.splice(spellIndex, 1);
+      await this.setRingSpellData(ring, storedSpells);
+
+      console.log(`${MODULE_ID} | Cast spell ${spell.name} from ${ring.name}`);
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error casting stored spell:`, error);
+      ui.notifications.error('Failed to cast stored spell');
+    }
+  }
+
+  /**
+   * Remove a stored spell from the ring
+   */
+  static async removeStoredSpell(ring, spellIndex) {
+    try {
+      const storedSpells = this.getRingSpellData(ring);
+      const spell = storedSpells[spellIndex];
+
+      if (!spell) {
+        ui.notifications.error('Spell not found in ring');
+        return;
+      }
+
+      // Confirm removal
+      const confirmed = await Dialog.confirm({
+        title: 'Remove Stored Spell',
+        content: `<p>Are you sure you want to remove <strong>${spell.name}</strong> from ${ring.name}?</p>
+                  <p><em>This action cannot be undone.</em></p>`,
+        yes: () => true,
+        no: () => false
+      });
+
+      if (confirmed) {
+        storedSpells.splice(spellIndex, 1);
+        await this.setRingSpellData(ring, storedSpells);
+
+        ui.notifications.info(`${spell.name} has been removed from ${ring.name}`);
+        console.log(`${MODULE_ID} | Removed spell ${spell.name} from ${ring.name}`);
+
+        // Refresh the management dialog if it's open
+        this.openRingManagementDialog(ring);
+      }
+
+    } catch (error) {
+      console.error(`${MODULE_ID} | Error removing stored spell:`, error);
+      ui.notifications.error('Failed to remove stored spell');
+    }
   }
 }
 
