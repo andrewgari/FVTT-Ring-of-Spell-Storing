@@ -322,6 +322,71 @@ window.testRingFix = function() {
   return true;
 };
 
+// Test item sheet hook specifically
+window.testItemSheetHook = function() {
+  console.log('=== TESTING ITEM SHEET HOOK ===');
+
+  const actor = detectCharacter(false);
+  if (!actor) {
+    console.error('❌ No character detected');
+    return false;
+  }
+
+  const api = game.modules.get('ring-of-spell-storing')?.api;
+  if (!api) {
+    console.error('❌ Module API not available');
+    return false;
+  }
+
+  const rings = api.findRingsOnActor(actor);
+  if (rings.length === 0) {
+    console.error('❌ No rings found');
+    return false;
+  }
+
+  const ring = rings[0];
+  console.log(`🔍 Testing with ring: ${ring.name}`);
+
+  // Add a temporary hook to see if it fires
+  const hookId = Hooks.on('renderItemSheet', (sheet, html, data) => {
+    if (sheet.item.id === ring.id) {
+      console.log('🎯 ITEM SHEET HOOK FIRED!');
+      console.log('   Sheet type:', sheet.constructor.name);
+      console.log('   HTML length:', html.length);
+      console.log('   Ring name:', sheet.item.name);
+
+      // Test if our method gets called
+      const module = game.modules.get('ring-of-spell-storing');
+      if (module.api.isRingOfSpellStoring(sheet.item)) {
+        console.log('✅ Ring recognized by module');
+
+        // Try to manually add the interface
+        module.api.addSpellManagementToItemSheet(html, sheet.item).then(() => {
+          console.log('✅ Manual interface injection completed');
+        }).catch(error => {
+          console.error('❌ Manual interface injection failed:', error);
+        });
+      } else {
+        console.log('❌ Ring NOT recognized by module');
+      }
+
+      // Remove the temporary hook
+      Hooks.off('renderItemSheet', hookId);
+    }
+  });
+
+  console.log('🔄 Opening ring item sheet...');
+  ring.sheet.render(true);
+
+  // Clean up hook after 5 seconds if it doesn't fire
+  setTimeout(() => {
+    Hooks.off('renderItemSheet', hookId);
+    console.log('⏰ Hook cleanup completed');
+  }, 5000);
+
+  return true;
+};
+
 console.log('🔧 Ring of Spell Storing Diagnostics Loaded!');
 console.log('📋 Available commands:');
 console.log('  🚀 testRingFix() - Quick test after applying the fix (enhanced character detection)');
@@ -329,6 +394,7 @@ console.log('  🔍 ringQuickTest() - Full diagnostic with auto-detect character
 console.log('  🎯 ringTestSelected() - Test with selected token');
 console.log('  📝 ringTestByName("Character Name") - Test with specific character by name');
 console.log('  🛠️  ringDiagnostics() - Advanced diagnostics');
+console.log('  🔧 testItemSheetHook() - Test if item sheet hook is working');
 console.log('');
 console.log('💡 Character Detection Priority:');
 console.log('  1. Selected token on canvas (highest priority)');
