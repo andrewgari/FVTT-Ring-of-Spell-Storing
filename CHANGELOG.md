@@ -1,3 +1,8 @@
+## [1.0.35] - 2025-07-30
+
+### Changes
+- Enhance ring data retrieval with additional logging and implement spell slot consumption and restoration methods
+
 ## [1.0.34] - 2025-07-30
 
 ### Changes
