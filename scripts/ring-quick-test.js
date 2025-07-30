@@ -359,7 +359,7 @@ window.testAllItemHooks = function() {
   const hookIds = [];
 
   hookNames.forEach(hookName => {
-    const hookId = Hooks.on(hookName, (sheet, html, data) => {
+    const hookId = Hooks.on(hookName, (sheet, html, _data) => {
       if (sheet.document?.id === ring.id || sheet.item?.id === ring.id) {
         console.log(`🎯 HOOK FIRED: ${hookName}`);
         console.log('   Sheet type:', sheet.constructor.name);
@@ -414,7 +414,7 @@ window.testItemSheetHook = function() {
   console.log(`🔍 Testing with ring: ${ring.name}`);
 
   // Add a temporary hook to see if it fires
-  const hookId = Hooks.on('renderItemSheet', (sheet, html, data) => {
+  const hookId = Hooks.on('renderItemSheet', (sheet, html, _data) => {
     if (sheet.item.id === ring.id) {
       console.log('🎯 ITEM SHEET HOOK FIRED!');
       console.log('   Sheet type:', sheet.constructor.name);

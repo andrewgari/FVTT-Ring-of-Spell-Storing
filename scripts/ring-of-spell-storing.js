@@ -259,12 +259,14 @@ class RingOfSpellStoring {
    */
   static onGetItemContextOptions(item, contextOptions) {
     try {
+      console.log(`${MODULE_ID} | onGetItemContextOptions called for item: ${item?.name} (type: ${item?.type})`);
+
       // Only add context menu for Ring of Spell Storing
       if (!this.isRingOfSpellStoring(item)) {
         return contextOptions;
       }
 
-      console.log(`${MODULE_ID} | Adding context menu options for ${item.name}`);
+      console.log(`${MODULE_ID} | Adding context menu options for Ring of Spell Storing: ${item.name}`);
 
       // Add ring management options to the context menu
       const ringOptions = [
@@ -272,25 +274,35 @@ class RingOfSpellStoring {
           name: '🔮 Manage Stored Spells',
           icon: '<i class="fas fa-magic"></i>',
           condition: () => true,
-          callback: () => this.openRingManagementDialog(item)
+          callback: () => {
+            console.log(`${MODULE_ID} | Context menu: Manage Stored Spells clicked`);
+            this.openRingManagementDialog(item);
+          }
         },
         {
           name: '📥 Store New Spell',
           icon: '<i class="fas fa-plus-circle"></i>',
           condition: () => true,
-          callback: () => this.openStoreSpellDialog(item)
+          callback: () => {
+            console.log(`${MODULE_ID} | Context menu: Store New Spell clicked`);
+            this.openStoreSpellDialog(item);
+          }
         },
         {
           name: '📋 View Ring Contents',
           icon: '<i class="fas fa-list"></i>',
           condition: () => true,
-          callback: () => this.showRingContents(item)
+          callback: () => {
+            console.log(`${MODULE_ID} | Context menu: View Ring Contents clicked`);
+            this.showRingContents(item);
+          }
         }
       ];
 
       // Insert ring options at the beginning of the context menu
       contextOptions.unshift(...ringOptions);
 
+      console.log(`${MODULE_ID} | Added ${ringOptions.length} context menu options`);
       return contextOptions;
     } catch (error) {
       console.error(`${MODULE_ID} | Error in onGetItemContextOptions:`, error);
@@ -343,23 +355,40 @@ class RingOfSpellStoring {
    * Check if an item is a Ring of Spell Storing
    */
   static isRingOfSpellStoring(item) {
-    if (item.type !== 'equipment') {
+    if (!item || item.type !== 'equipment') {
       return false;
     }
 
-    // Check by name (primary method)
-    if (item.name === RING_ITEM_NAME) {
+    const itemName = item.name?.toLowerCase() || '';
+
+    // Check by exact name match (case insensitive)
+    if (itemName === 'ring of spell storing') {
+      return true;
+    }
+
+    // Check by partial name match
+    if (itemName.includes('ring of spell storing')) {
       return true;
     }
 
     // Check by flags (for items that have been modified)
-    if (item.system.flags?.[MODULE_ID]) {
+    if (item.system?.flags?.[MODULE_ID]) {
       return true;
     }
 
-    // Check by description or other identifiers if needed
-    const description = item.system.description?.value || '';
-    if (description.toLowerCase().includes('ring of spell storing')) {
+    // Check by item flags (alternative location)
+    if (item.flags?.[MODULE_ID]) {
+      return true;
+    }
+
+    // Check by description or other identifiers
+    const description = item.system?.description?.value?.toLowerCase() || '';
+    if (description.includes('ring of spell storing')) {
+      return true;
+    }
+
+    // Check for any ring with "spell storing" in the name
+    if (itemName.includes('spell storing') && itemName.includes('ring')) {
       return true;
     }
 
@@ -789,27 +818,22 @@ class RingOfSpellStoring {
    * Find all Rings of Spell Storing on an actor
    */
   static findRingsOnActor(actor) {
+    if (!actor) {
+      console.warn(`${MODULE_ID} | No actor provided to findRingsOnActor`);
+      return [];
+    }
+
     console.log(`${MODULE_ID} | Searching for rings on ${actor.name}`);
     const rings = [];
 
-    // Find all equipped rings that match our criteria
+    // Find all rings that match our criteria (equipped or not)
     actor.items.forEach(item => {
       console.log(`${MODULE_ID} | Checking item: ${item.name} (type: ${item.type}, equipped: ${item.system?.equipped})`);
 
-      if (item.type === 'equipment' && item.system.equipped) {
-        // Check for exact name match
-        if (item.name === RING_ITEM_NAME) {
-          console.log(`${MODULE_ID} | Found exact match: ${item.name}`);
-          rings.push(item);
-        } else if (item.name.toLowerCase().includes('ring of spell storing')) {
-          // Check for case-insensitive partial match
-          console.log(`${MODULE_ID} | Found partial match: ${item.name}`);
-          rings.push(item);
-        } else if (item.name.toLowerCase().includes('spell storing')) {
-          // Check for any ring with spell storing in the name
-          console.log(`${MODULE_ID} | Found spell storing match: ${item.name}`);
-          rings.push(item);
-        }
+      // Use our improved detection method
+      if (this.isRingOfSpellStoring(item)) {
+        console.log(`${MODULE_ID} | Found Ring of Spell Storing: ${item.name} (equipped: ${item.system?.equipped})`);
+        rings.push(item);
       }
     });
 
@@ -1829,7 +1853,32 @@ class RingOfSpellStoring {
 
 // Initialize module when Foundry is ready
 Hooks.once('init', () => {
-  RingOfSpellStoring.initialize();
+  console.log('ring-of-spell-storing | Init hook fired');
+  try {
+    RingOfSpellStoring.initialize();
+    console.log('ring-of-spell-storing | Module initialized successfully');
+  } catch (error) {
+    console.error('ring-of-spell-storing | Error during initialization:', error);
+  }
+});
+
+// Additional ready hook for safety
+Hooks.once('ready', () => {
+  console.log('ring-of-spell-storing | Ready hook fired');
+
+  // Verify module is working
+  const module = game.modules.get('ring-of-spell-storing');
+  if (module?.active) {
+    console.log('ring-of-spell-storing | Module is active and ready');
+
+    // Make API globally available for debugging
+    if (module.api) {
+      window.RingOfSpellStoringAPI = module.api;
+      console.log('ring-of-spell-storing | API made globally available');
+    }
+  } else {
+    console.error('ring-of-spell-storing | Module not active in ready hook');
+  }
 });
 
 // Export for API access

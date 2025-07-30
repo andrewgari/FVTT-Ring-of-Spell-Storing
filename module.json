@@ -30,7 +30,8 @@
   ],
   "scripts": [
     "scripts/ring-test.js",
-    "scripts/ring-quick-test.js"
+    "scripts/ring-quick-test.js",
+    "scripts/ring-simple-test.js"
   ],
   "styles": [
     "styles/ring-styles.css"
