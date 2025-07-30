@@ -1,3 +1,8 @@
+## [1.0.21] - 2025-07-30
+
+### Changes
+- Add comprehensive hook diagnostics for item sheet issue
+
 ## [1.0.20] - 2025-07-30
 
 ### Changes
