@@ -1,3 +1,8 @@
+## [1.0.29] - 2025-07-30
+
+### Changes
+- Enhance ring data retrieval with improved validation and error handling
+
 ## [1.0.28] - 2025-07-30
 
 ### Changes
