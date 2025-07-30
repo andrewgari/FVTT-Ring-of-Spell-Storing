@@ -1,3 +1,8 @@
+## [1.0.31] - 2025-07-30
+
+### Changes
+- Refactor ring data update process to utilize main module API and improve error handling
+
 ## [1.0.30] - 2025-07-30
 
 ### Changes
