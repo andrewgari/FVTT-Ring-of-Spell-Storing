@@ -66,6 +66,11 @@ class RingOfSpellStoring {
     Hooks.on('ready', this.onReady.bind(this));
 
     // Hook into item sheet rendering to add ring spell management
+    // D&D 5e uses renderApplication for item sheets, not renderItemSheet
+    Hooks.on('renderApplication', this.onRenderItemSheet.bind(this));
+    console.log(`${MODULE_ID} | Registered hook: renderApplication`);
+
+    // Also register the standard hook for compatibility
     Hooks.on('renderItemSheet', this.onRenderItemSheet.bind(this));
     console.log(`${MODULE_ID} | Registered hook: renderItemSheet`);
 
@@ -231,11 +236,20 @@ class RingOfSpellStoring {
 
   /**
    * Handle item sheet rendering to add ring spell management interface
+   * This handles both renderItemSheet and renderApplication hooks
    */
   static onRenderItemSheet(sheet, html, _data) {
     try {
-      const item = sheet.item;
-      console.log(`${MODULE_ID} | onRenderItemSheet called for ${item.name} (type: ${item.type})`);
+      // Handle different hook signatures
+      // renderApplication: sheet is the application, item is sheet.document or sheet.item
+      // renderItemSheet: sheet is the item sheet, item is sheet.item
+      const item = sheet.document || sheet.item;
+
+      if (!item) {
+        return; // Not an item sheet
+      }
+
+      console.log(`${MODULE_ID} | onRenderItemSheet called for ${item.name} (type: ${item.type}, sheet: ${sheet.constructor.name})`);
 
       // Check if this is a Ring of Spell Storing
       if (!this.isRingOfSpellStoring(item)) {
