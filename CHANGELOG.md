@@ -1,3 +1,8 @@
+## [1.0.36] - 2025-07-30
+
+### Changes
+- Refactor ring data update process to improve logging and error handling during spell storage
+
 ## [1.0.35] - 2025-07-30
 
 ### Changes
