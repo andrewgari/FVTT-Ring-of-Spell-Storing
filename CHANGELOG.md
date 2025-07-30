@@ -1,3 +1,8 @@
+## [1.0.26] - 2025-07-30
+
+### Changes
+- Ensure jQuery compatibility for HTML elements in ring management functions
+
 ## [1.0.25] - 2025-07-30
 
 ### Changes
