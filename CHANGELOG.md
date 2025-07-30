@@ -1,3 +1,8 @@
+## [1.0.22] - 2025-07-30
+
+### Changes
+- CRITICAL FIX: Use renderApplication hook for D&D 5e item sheets
+
 ## [1.0.21] - 2025-07-30
 
 ### Changes
