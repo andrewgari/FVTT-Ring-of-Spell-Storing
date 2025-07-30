@@ -1,3 +1,8 @@
+## [1.0.38] - 2025-07-30
+
+### Changes
+- Enhance stored spells retrieval process with multiple fallback methods and improved logging
+
 ## [1.0.37] - 2025-07-30
 
 ### Changes
