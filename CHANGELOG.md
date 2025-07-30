@@ -1,3 +1,8 @@
+## [1.0.33] - 2025-07-30
+
+### Changes
+- Enhance ring data retrieval with comprehensive logging for data location checks
+
 ## [1.0.32] - 2025-07-30
 
 ### Changes
