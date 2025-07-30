@@ -1,3 +1,8 @@
+## [1.0.20] - 2025-07-30
+
+### Changes
+- Add item sheet hook diagnostic test
+
 ## [1.0.19] - 2025-07-30
 
 ### Changes
