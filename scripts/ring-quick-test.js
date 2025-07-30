@@ -216,8 +216,42 @@ window.ringTestSelected = function() {
   return window.ringQuickTest(selectedToken.actor);
 };
 
+// Quick fix test - run this after the module fix
+window.testRingFix = function() {
+  console.log('=== TESTING RING FIX ===');
+
+  const actor = game.user.character;
+  if (!actor) {
+    console.error('No character selected');
+    return false;
+  }
+
+  const module = game.modules.get('ring-of-spell-storing');
+  if (!module?.active) {
+    console.error('Module not active');
+    return false;
+  }
+
+  // Force re-render the character sheet
+  if (actor.sheet.rendered) {
+    console.log('Re-rendering character sheet...');
+    actor.sheet.render(false);
+
+    setTimeout(() => {
+      console.log('✅ Sheet re-rendered! Check your Spells tab for ring sections.');
+      console.log('If you still don\'t see anything, run ringQuickTest() for full diagnostics.');
+    }, 500);
+  } else {
+    console.log('Opening character sheet...');
+    actor.sheet.render(true);
+  }
+
+  return true;
+};
+
 console.log('Ring Quick Test loaded!');
 console.log('Available commands:');
+console.log('  testRingFix() - Quick test after applying the fix');
 console.log('  ringQuickTest() - Auto-detect character (selected token > assigned character)');
 console.log('  ringTestSelected() - Test with selected token');
 console.log('  ringTestByName("Character Name") - Test with specific character by name');
