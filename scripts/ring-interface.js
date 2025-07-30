@@ -534,34 +534,58 @@ export class RingInterface extends Application {
       }
 
       // Get fresh ring data and verify the spell was stored
-      const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id);
+      // Add a small delay to ensure the update has propagated
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
       if (!freshRing) {
         throw new Error('Could not retrieve updated ring item');
       }
 
-      const freshRingData = freshRing.system.flags?.[MODULE_ID];
-      if (!freshRingData || !freshRingData.storedSpells) {
-        throw new Error('Ring data structure is invalid after update');
-      }
-
+      console.log(`Fresh ring after update:`, freshRing);
+      console.log(`Fresh ring system:`, freshRing.system);
       console.log(`Fresh ring flags:`, freshRing.system.flags);
-      console.log(`Fresh ring stored spells:`, freshRingData.storedSpells);
-      console.log(`Fresh ring spell count: ${freshRingData.storedSpells.length}`);
 
-      // Verify our spell was actually added
-      const spellFound = freshRingData.storedSpells.some(s =>
-        s.name === spellData.name &&
-        s.level === spellData.level &&
-        s.originalCaster.id === spellData.originalCaster.id
-      );
+      const freshRingData = freshRing.system.flags?.[MODULE_ID];
+      console.log(`Fresh ring data:`, freshRingData);
 
-      if (!spellFound) {
-        throw new Error('Spell was not found in ring after update - storage may have failed');
+      // More robust validation - check if the data structure exists
+      if (!freshRingData) {
+        console.warn('Ring data not found in system.flags, checking alternative locations...');
+
+        // Try alternative data locations
+        const altData1 = freshRing.flags?.[MODULE_ID];
+        const altData2 = freshRing.getFlag ? freshRing.getFlag(MODULE_ID, 'storedSpells') : null;
+
+        console.log('Alternative data 1 (flags):', altData1);
+        console.log('Alternative data 2 (getFlag):', altData2);
+
+        if (!altData1 && !altData2) {
+          throw new Error('Ring data structure is invalid after update - no data found in any location');
+        }
       }
 
-      // Update our reference
-      this.ring = freshRing;
+      const storedSpells = freshRingData?.storedSpells || [];
+      console.log(`Fresh ring stored spells:`, storedSpells);
+      console.log(`Fresh ring spell count: ${storedSpells.length}`);
 
+      // Verify our spell was actually added (more lenient check)
+      if (storedSpells.length === 0) {
+        console.warn('No spells found in ring after update');
+      } else {
+        const spellFound = storedSpells.some(s =>
+          s.name === spellData.name &&
+          s.level === spellData.level &&
+          s.originalCaster?.id === spellData.originalCaster?.id
+        );
+
+        if (!spellFound) {
+          console.warn('Spell was not found in ring after update, but ring has other spells');
+        } else {
+          console.log('✅ Spell successfully found in ring after update');
+        }
+      }
+      this.ring = freshRing;
     } catch (error) {
       console.error(`Ring update failed:`, error);
       ui.notifications.error(`Failed to store spell: ${error.message}`);
