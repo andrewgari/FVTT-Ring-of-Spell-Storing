@@ -515,6 +515,11 @@ export class RingInterface extends Application {
     try {
       // Try to use the main module's API for consistent data handling
       const moduleAPI = game.modules.get('ring-of-spell-storing')?.api;
+      console.log(`Module check:`, game.modules.get('ring-of-spell-storing'));
+      console.log(`Module API:`, moduleAPI);
+      console.log(`Module API keys:`, moduleAPI ? Object.keys(moduleAPI) : 'No API');
+      console.log(`setRingSpellData available:`, moduleAPI?.setRingSpellData ? 'Yes' : 'No');
+
       if (moduleAPI && moduleAPI.setRingSpellData) {
         console.log(`Using main module's setRingSpellData function...`);
         const success = await moduleAPI.setRingSpellData(this.ring, ringData.storedSpells);
@@ -540,6 +545,12 @@ export class RingInterface extends Application {
           console.log(`Embedded update data:`, embeddedUpdateData);
           updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
           console.log(`Embedded update result:`, updateResult);
+          console.log(`Update result type:`, typeof updateResult);
+          console.log(`Update result is array:`, Array.isArray(updateResult));
+          console.log(`Update result length:`, updateResult?.length);
+          const immediateCheck = this.actor.items.get(this.ring.id);
+          console.log(`Immediate check - ring flags:`, immediateCheck?.system?.flags);
+          console.log(`Immediate check - ring MODULE_ID data:`, immediateCheck?.system?.flags?.[MODULE_ID]);
         } else {
           // Ring is a world item, update directly
           console.log(`Updating ring directly (world item)...`);
