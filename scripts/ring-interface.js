@@ -551,6 +551,29 @@ export class RingInterface extends Application {
           const immediateCheck = this.actor.items.get(this.ring.id);
           console.log(`Immediate check - ring flags:`, immediateCheck?.system?.flags);
           console.log(`Immediate check - ring MODULE_ID data:`, immediateCheck?.system?.flags?.[MODULE_ID]);
+
+          // Check all possible locations where data might be stored
+          console.log(`=== COMPREHENSIVE DATA LOCATION CHECK ===`);
+          console.log(`Ring system:`, immediateCheck?.system);
+          console.log(`Ring flags (direct):`, immediateCheck?.flags);
+          console.log(`Ring system.flags:`, immediateCheck?.system?.flags);
+          console.log(`Ring getFlag result:`, immediateCheck?.getFlag ? immediateCheck.getFlag(MODULE_ID, 'storedSpells') : 'No getFlag method');
+
+          // Check if data is stored under a different key
+          if (immediateCheck?.system?.flags) {
+            console.log(`All system.flags keys:`, Object.keys(immediateCheck.system.flags));
+            Object.keys(immediateCheck.system.flags).forEach(key => {
+              console.log(`system.flags.${key}:`, immediateCheck.system.flags[key]);
+            });
+          }
+
+          if (immediateCheck?.flags) {
+            console.log(`All flags keys:`, Object.keys(immediateCheck.flags));
+            Object.keys(immediateCheck.flags).forEach(key => {
+              console.log(`flags.${key}:`, immediateCheck.flags[key]);
+            });
+          }
+          console.log(`=== END COMPREHENSIVE CHECK ===`);
         } else {
           // Ring is a world item, update directly
           console.log(`Updating ring directly (world item)...`);
