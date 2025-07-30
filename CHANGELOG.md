@@ -1,3 +1,8 @@
+## [1.0.32] - 2025-07-30
+
+### Changes
+- Enhance ring data update process with additional logging for module API checks and update results
+
 ## [1.0.31] - 2025-07-30
 
 ### Changes
