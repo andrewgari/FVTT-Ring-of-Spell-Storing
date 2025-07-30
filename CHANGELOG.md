@@ -1,3 +1,8 @@
+## [1.0.19] - 2025-07-30
+
+### Changes
+- Fix character detection in diagnostic functions
+
 ## [1.0.18] - 2025-07-30
 
 ### Changes
