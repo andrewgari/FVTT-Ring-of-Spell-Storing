@@ -461,6 +461,13 @@ class RingOfSpellStoring {
     try {
       console.log(`${MODULE_ID} | Adding spell management interface to ${ring.name}`);
 
+      // Ensure html is a jQuery object
+      const $html = html instanceof jQuery ? html : $(html);
+      if (!$html || $html.length === 0) {
+        console.warn(`${MODULE_ID} | Invalid HTML object provided`);
+        return;
+      }
+
       // Get ring data - try multiple flag locations for compatibility
       const ringData = ring.system.flags?.[MODULE_ID] || ring.flags?.[MODULE_ID] || { storedSpells: [] };
       const storedSpells = ringData.storedSpells || [];
@@ -483,7 +490,7 @@ class RingOfSpellStoring {
 
       let targetContainer = null;
       for (const selector of targetSelectors) {
-        targetContainer = html.find(selector);
+        targetContainer = $html.find(selector);
         if (targetContainer.length > 0) {
           console.log(`${MODULE_ID} | Found target container: ${selector} (${targetContainer.length} elements)`);
           break;
@@ -492,12 +499,12 @@ class RingOfSpellStoring {
 
       if (!targetContainer || targetContainer.length === 0) {
         console.warn(`${MODULE_ID} | No suitable container found for spell management interface`);
-        console.log(`${MODULE_ID} | Available elements:`, html.find('*').map((i, el) => el.tagName + (el.className ? '.' + el.className.replace(/\s+/g, '.') : '')).get());
+        console.log(`${MODULE_ID} | Available elements:`, $html.find('*').map((i, el) => el.tagName + (el.className ? '.' + el.className.replace(/\s+/g, '.') : '')).get());
         return;
       }
 
       // Remove any existing ring management interface to prevent duplicates
-      html.find('.ring-spell-management').remove();
+      $html.find('.ring-spell-management').remove();
 
       // Create the spell management section
       const spellManagementSection = $(`
@@ -1894,6 +1901,13 @@ class RingOfSpellStoring {
    */
   static addRingHeaderButton(html, ring) {
     try {
+      // Ensure html is a jQuery object
+      const $html = html instanceof jQuery ? html : $(html);
+      if (!$html || $html.length === 0) {
+        console.warn(`${MODULE_ID} | Invalid HTML object provided`);
+        return;
+      }
+
       // Find the header buttons area
       const headerSelectors = [
         '.window-header .header-buttons',
@@ -1904,7 +1918,7 @@ class RingOfSpellStoring {
 
       let headerContainer = null;
       for (const selector of headerSelectors) {
-        headerContainer = html.find(selector);
+        headerContainer = $html.find(selector);
         if (headerContainer.length > 0) {
           break;
         }
@@ -1916,7 +1930,7 @@ class RingOfSpellStoring {
       }
 
       // Remove existing button to prevent duplicates
-      html.find('.ring-management-header-btn').remove();
+      $html.find('.ring-management-header-btn').remove();
 
       // Create header button
       const headerButton = $(`
