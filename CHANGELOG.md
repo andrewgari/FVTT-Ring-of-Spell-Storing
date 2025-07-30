@@ -1,3 +1,8 @@
+## [1.0.25] - 2025-07-30
+
+### Changes
+- Enhance item sheet integration and compatibility for Ring of Spell Storing
+
 ## [1.0.24] - 2025-07-30
 
 ### Changes
