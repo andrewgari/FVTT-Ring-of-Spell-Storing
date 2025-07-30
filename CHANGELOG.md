@@ -1,3 +1,8 @@
+## [1.0.23] - 2025-07-30
+
+### Changes
+- Add context menu test function%0A- MAJOR: Implement context menu system for Ring of Spell Storing
+
 ## [1.0.22] - 2025-07-30
 
 ### Changes
