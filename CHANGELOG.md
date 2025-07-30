@@ -1,3 +1,8 @@
+## [1.0.28] - 2025-07-30
+
+### Changes
+- Refactor ring spell data retrieval and update methods for improved compatibility with ring-interface.js
+
 ## [1.0.27] - 2025-07-30
 
 ### Changes
