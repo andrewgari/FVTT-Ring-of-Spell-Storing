@@ -142,28 +142,19 @@ class RingOfSpellStoring {
       removeSpellFromRing: this.removeSpellFromRing.bind(this),
       transferRing: this.transferRing.bind(this),
       openRingInterface: this.openRingInterface.bind(this),
-      castRingSpellFromList: this.castRingSpellFromList.bind(this),
-      debugActorRings: this.debugActorRings.bind(this),
-      debugActorItems: this.debugActorItems.bind(this),
-      // Item-centric methods
-      isRingOfSpellStoring: this.isRingOfSpellStoring.bind(this),
-      addSpellManagementToItemSheet: this.addSpellManagementToItemSheet.bind(this),
-      // Context menu methods
-      openRingManagementDialog: this.openRingManagementDialog.bind(this),
-      openStoreSpellDialog: this.openStoreSpellDialog.bind(this),
-      showRingContents: this.showRingContents.bind(this),
-      storeSpellFromDialog: this.storeSpellFromDialog.bind(this),
-      // Ring data management
+      // Data management methods
       getRingSpellData: this.getRingSpellData.bind(this),
       setRingSpellData: this.setRingSpellData.bind(this),
-      calculateUsedLevels: this.calculateUsedLevels.bind(this),
-      hasCapacity: this.hasCapacity.bind(this),
       // Diagnostic methods
-      runDiagnostics: RingDiagnostics.diagnoseCharacterSheetIntegration.bind(RingDiagnostics),
+      diagnoseRing: RingDiagnostics.diagnoseRing.bind(RingDiagnostics),
+      testRingDetection: RingDiagnostics.testRingDetection.bind(RingDiagnostics),
+      testUIInjection: RingDiagnostics.testUIInjection.bind(RingDiagnostics),
       checkModuleStatus: RingDiagnostics.checkModuleInitialization.bind(RingDiagnostics),
       // Helper methods for character selection
       getSelectedActor: this.getSelectedActor.bind(this),
-      testWithSelectedToken: this.testWithSelectedToken.bind(this)
+      testWithSelectedToken: this.testWithSelectedToken.bind(this),
+      // Main class reference for direct access
+      RingOfSpellStoring: this
     };
 
     game.modules.get(MODULE_ID).api = api;

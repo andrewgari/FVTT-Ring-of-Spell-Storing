@@ -513,89 +513,48 @@ export class RingInterface extends Application {
     console.log(`Ring system before update:`, this.ring.system);
 
     try {
-      let updateResult;
-
-      // Determine the correct update method based on ring ownership
-      if (this.ring.parent === this.actor) {
-        // Ring is owned by actor, update through actor (embedded document)
-        console.log(`Updating ring through actor (embedded document)...`);
-
-        const embeddedUpdateData = {
-          _id: this.ring.id,
-          [`system.flags.${MODULE_ID}`]: ringData
-        };
-
-        console.log(`Embedded update data:`, embeddedUpdateData);
-        updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
-        console.log(`Embedded update result:`, updateResult);
-      } else {
-        // Ring is a world item, update directly
-        console.log(`Updating ring directly (world item)...`);
-        const updateData = {
-          [`system.flags.${MODULE_ID}`]: ringData
-        };
-        updateResult = await this.ring.update(updateData);
-        console.log(`Direct update result:`, updateResult);
-      }
-
-      // Verify the update was successful
-      if (!updateResult) {
-        throw new Error('Update operation returned null or undefined');
-      }
-
-      // Get fresh ring data and verify the spell was stored
-      // Add a small delay to ensure the update has propagated
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const freshRing = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
-      if (!freshRing) {
-        throw new Error('Could not retrieve updated ring item');
-      }
-
-      console.log(`Fresh ring after update:`, freshRing);
-      console.log(`Fresh ring system:`, freshRing.system);
-      console.log(`Fresh ring flags:`, freshRing.system.flags);
-
-      const freshRingData = freshRing.system.flags?.[MODULE_ID];
-      console.log(`Fresh ring data:`, freshRingData);
-
-      // More robust validation - check if the data structure exists
-      if (!freshRingData) {
-        console.warn('Ring data not found in system.flags, checking alternative locations...');
-
-        // Try alternative data locations
-        const altData1 = freshRing.flags?.[MODULE_ID];
-        const altData2 = freshRing.getFlag ? freshRing.getFlag(MODULE_ID, 'storedSpells') : null;
-
-        console.log('Alternative data 1 (flags):', altData1);
-        console.log('Alternative data 2 (getFlag):', altData2);
-
-        if (!altData1 && !altData2) {
-          throw new Error('Ring data structure is invalid after update - no data found in any location');
+      // Try to use the main module's API for consistent data handling
+      const moduleAPI = game.modules.get('ring-of-spell-storing')?.api;
+      if (moduleAPI && moduleAPI.setRingSpellData) {
+        console.log(`Using main module's setRingSpellData function...`);
+        const success = await moduleAPI.setRingSpellData(this.ring, ringData.storedSpells);
+        if (!success) {
+          throw new Error('Main module setRingSpellData returned false');
         }
-      }
-
-      const storedSpells = freshRingData?.storedSpells || [];
-      console.log(`Fresh ring stored spells:`, storedSpells);
-      console.log(`Fresh ring spell count: ${storedSpells.length}`);
-
-      // Verify our spell was actually added (more lenient check)
-      if (storedSpells.length === 0) {
-        console.warn('No spells found in ring after update');
+        console.log(`✅ Successfully used main module's setRingSpellData`);
       } else {
-        const spellFound = storedSpells.some(s =>
-          s.name === spellData.name &&
-          s.level === spellData.level &&
-          s.originalCaster?.id === spellData.originalCaster?.id
-        );
+        // Fallback to manual update if API not available
+        console.warn('Main module API not available, using manual update');
+        let updateResult;
 
-        if (!spellFound) {
-          console.warn('Spell was not found in ring after update, but ring has other spells');
+        // Determine the correct update method based on ring ownership
+        if (this.ring.parent === this.actor) {
+          // Ring is owned by actor, update through actor (embedded document)
+          console.log(`Updating ring through actor (embedded document)...`);
+
+          const embeddedUpdateData = {
+            _id: this.ring.id,
+            [`system.flags.${MODULE_ID}`]: ringData
+          };
+
+          console.log(`Embedded update data:`, embeddedUpdateData);
+          updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
+          console.log(`Embedded update result:`, updateResult);
         } else {
-          console.log('✅ Spell successfully found in ring after update');
+          // Ring is a world item, update directly
+          console.log(`Updating ring directly (world item)...`);
+          const updateData = {
+            [`system.flags.${MODULE_ID}`]: ringData
+          };
+          updateResult = await this.ring.update(updateData);
+          console.log(`Direct update result:`, updateResult);
+        }
+
+        // Verify the update was successful
+        if (!updateResult) {
+          throw new Error('Update operation returned null or undefined');
         }
       }
-      this.ring = freshRing;
     } catch (error) {
       console.error(`Ring update failed:`, error);
       ui.notifications.error(`Failed to store spell: ${error.message}`);
