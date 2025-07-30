@@ -1,3 +1,8 @@
+## [1.0.30] - 2025-07-30
+
+### Changes
+- Enhance ring data retrieval with additional logging and post-storage verification
+
 ## [1.0.29] - 2025-07-30
 
 ### Changes
