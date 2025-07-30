@@ -608,6 +608,43 @@ export class RingInterface extends Application {
       return false;
     }
 
+    // Wait a moment for the update to propagate
+    console.log('Waiting for update to propagate...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Force a fresh retrieval of the ring data
+    console.log('=== FRESH DATA RETRIEVAL ===');
+    const freshActor = game.actors.get(this.actor.id);
+    const freshRing = freshActor?.items?.get(this.ring.id);
+    console.log('Fresh actor:', freshActor?.name);
+    console.log('Fresh ring:', freshRing?.name);
+    console.log('Fresh ring system.flags:', freshRing?.system?.flags);
+    console.log('Fresh ring flags[MODULE_ID]:', freshRing?.system?.flags?.[MODULE_ID]);
+
+    // Try multiple ways to get the data
+    const flagData1 = freshRing?.system?.flags?.[MODULE_ID];
+    const flagData2 = freshRing?.getFlag?.(MODULE_ID, 'storedSpells');
+    const flagData3 = freshRing?.flags?.[MODULE_ID];
+
+    console.log('Method 1 (system.flags):', flagData1);
+    console.log('Method 2 (getFlag):', flagData2);
+    console.log('Method 3 (direct flags):', flagData3);
+
+    // Check if the data exists anywhere
+    if (flagData1?.storedSpells?.length > 0) {
+      console.log('✅ Data found via system.flags!');
+      console.log('Stored spells:', flagData1.storedSpells);
+    } else if (flagData2?.length > 0) {
+      console.log('✅ Data found via getFlag!');
+      console.log('Stored spells:', flagData2);
+    } else if (flagData3?.storedSpells?.length > 0) {
+      console.log('✅ Data found via direct flags!');
+      console.log('Stored spells:', flagData3.storedSpells);
+    } else {
+      console.log('❌ No data found in any location');
+    }
+    console.log('=== END FRESH DATA RETRIEVAL ===');
+
     ui.notifications.info(
       game.i18n.format('RING_OF_SPELL_STORING.Notifications.SpellStored', {
         spell: spell.name,
@@ -638,73 +675,6 @@ export class RingInterface extends Application {
     console.log(`Forcing interface re-render`);
     this.render(true);
     return true;
-  }
-
-  /**
-   * Consume a spell slot from the actor
-   */
-  async consumeSpellSlot(actor, level, spellType) {
-    const spellcasting = actor.system.spells;
-
-    if (spellType === 'pact' && spellcasting.pact) {
-      // Consume pact magic slot
-      if (spellcasting.pact.value > 0) {
-        const newValue = spellcasting.pact.value - 1;
-        await actor.update({
-          'system.spells.pact.value': newValue
-        });
-        console.log(`Consumed pact slot: ${spellcasting.pact.value} -> ${newValue}`);
-        return true;
-      }
-      console.log(`No pact slots available: ${spellcasting.pact.value}`);
-      return false;
-    } else {
-      // Consume regular spell slot
-      const slotKey = `spell${level}`;
-      const slotData = spellcasting[slotKey];
-
-      if (slotData && slotData.value > 0) {
-        const newValue = slotData.value - 1;
-        await actor.update({
-          [`system.spells.${slotKey}.value`]: newValue
-        });
-        console.log(`Consumed ${slotKey} slot: ${slotData.value} -> ${newValue}`);
-        return true;
-      }
-      console.log(`No ${slotKey} slots available: ${slotData?.value || 0}`);
-      return false;
-    }
-  }
-
-  /**
-   * Restore a spell slot to the actor (used when spell storage fails)
-   */
-  async restoreSpellSlot(actor, level, spellType) {
-    const spellcasting = actor.system.spells;
-
-    if (spellType === 'pact' && spellcasting.pact) {
-      // Restore pact magic slot
-      const newValue = Math.min(spellcasting.pact.value + 1, spellcasting.pact.max);
-      await actor.update({
-        'system.spells.pact.value': newValue
-      });
-      console.log(`Restored pact slot: ${spellcasting.pact.value} -> ${newValue}`);
-      return true;
-    } else {
-      // Restore regular spell slot
-      const slotKey = `spell${level}`;
-      const slotData = spellcasting[slotKey];
-
-      if (slotData) {
-        const newValue = Math.min(slotData.value + 1, slotData.max);
-        await actor.update({
-          [`system.spells.${slotKey}.value`]: newValue
-        });
-        console.log(`Restored ${slotKey} slot: ${slotData.value} -> ${newValue}`);
-        return true;
-      }
-      return false;
-    }
   }
 
   /**
@@ -842,6 +812,73 @@ export class RingInterface extends Application {
     } catch (error) {
       console.error('Failed to remove spell from ring:', error);
       ui.notifications.error(`Failed to remove spell: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Consume a spell slot from the actor
+   */
+  async consumeSpellSlot(actor, level, spellType) {
+    const spellcasting = actor.system.spells;
+
+    if (spellType === 'pact' && spellcasting.pact) {
+      // Consume pact magic slot
+      if (spellcasting.pact.value > 0) {
+        const newValue = spellcasting.pact.value - 1;
+        await actor.update({
+          'system.spells.pact.value': newValue
+        });
+        console.log(`Consumed pact slot: ${spellcasting.pact.value} -> ${newValue}`);
+        return true;
+      }
+      console.log(`No pact slots available: ${spellcasting.pact.value}`);
+      return false;
+    } else {
+      // Consume regular spell slot
+      const slotKey = `spell${level}`;
+      const slotData = spellcasting[slotKey];
+
+      if (slotData && slotData.value > 0) {
+        const newValue = slotData.value - 1;
+        await actor.update({
+          [`system.spells.${slotKey}.value`]: newValue
+        });
+        console.log(`Consumed ${slotKey} slot: ${slotData.value} -> ${newValue}`);
+        return true;
+      }
+      console.log(`No ${slotKey} slots available: ${slotData?.value || 0}`);
+      return false;
+    }
+  }
+
+  /**
+   * Restore a spell slot to the actor (used when spell storage fails)
+   */
+  async restoreSpellSlot(actor, level, spellType) {
+    const spellcasting = actor.system.spells;
+
+    if (spellType === 'pact' && spellcasting.pact) {
+      // Restore pact magic slot
+      const newValue = Math.min(spellcasting.pact.value + 1, spellcasting.pact.max);
+      await actor.update({
+        'system.spells.pact.value': newValue
+      });
+      console.log(`Restored pact slot: ${spellcasting.pact.value} -> ${newValue}`);
+      return true;
+    } else {
+      // Restore regular spell slot
+      const slotKey = `spell${level}`;
+      const slotData = spellcasting[slotKey];
+
+      if (slotData) {
+        const newValue = Math.min(slotData.value + 1, slotData.max);
+        await actor.update({
+          [`system.spells.${slotKey}.value`]: newValue
+        });
+        console.log(`Restored ${slotKey} slot: ${slotData.value} -> ${newValue}`);
+        return true;
+      }
       return false;
     }
   }
