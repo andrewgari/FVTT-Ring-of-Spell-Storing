@@ -528,100 +528,72 @@ export class RingInterface extends Application {
         }
         console.log(`✅ Successfully used main module's setRingSpellData`);
       } else {
-        // Fallback to manual update if API not available
-        console.warn('Main module API not available, using manual update');
-        let updateResult;
-
         // Determine the correct update method based on ring ownership
         if (this.ring.parent === this.actor) {
-          // Ring is owned by actor, update through actor (embedded document)
-          console.log(`Updating ring through actor (embedded document)...`);
+          // Ring is owned by actor, use setFlag method for proper flag handling
+          console.log(`Updating ring through actor using setFlag method...`);
 
-          const embeddedUpdateData = {
-            _id: this.ring.id,
-            [`system.flags.${MODULE_ID}`]: ringData
-          };
+          try {
+            // Use FoundryVTT's proper flag system
+            const ringItem = this.actor.items.get(this.ring.id);
+            if (ringItem) {
+              console.log(`Found ring item in actor:`, ringItem.name);
+              console.log(`Setting flag with data:`, ringData);
 
-          console.log(`Embedded update data:`, embeddedUpdateData);
-          console.log(`Ring data being stored:`, ringData);
-          console.log(`Full update structure:`, JSON.stringify(embeddedUpdateData, null, 2));
+              // Use setFlag method which is the proper way to update flags
+              await ringItem.setFlag(MODULE_ID, 'storedSpells', ringData.storedSpells);
+              console.log(`setFlag result:`);
 
-          // Try the embedded document update
-          updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
-          console.log(`Embedded update result:`, updateResult);
-          console.log(`Update result type:`, typeof updateResult);
-          console.log(`Update result is array:`, Array.isArray(updateResult));
-          console.log(`Update result length:`, updateResult?.length);
+              // Verify immediately after setFlag
+              const immediateCheck = await ringItem.getFlag(MODULE_ID, 'storedSpells');
+              console.log(`Immediate flag check after setFlag:`, immediateCheck);
 
-          // Alternative approach: Try updating the item directly through the actor's item
-          console.log(`Trying alternative update approach...`);
-          const ringItem = this.actor.items.get(this.ring.id);
-          if (ringItem) {
-            console.log(`Found ring item in actor:`, ringItem.name);
-            const directUpdateData = {
-              [`system.flags.${MODULE_ID}`]: ringData
-            };
-            console.log(`Direct update data:`, directUpdateData);
+              if (!immediateCheck || immediateCheck.length === 0) {
+                console.warn(`setFlag didn't work, trying direct update...`);
+                // Fallback to direct update
+                const directUpdateData = {
+                  [`system.flags.${MODULE_ID}.storedSpells`]: ringData.storedSpells
+                };
+                console.log(`Direct update data:`, directUpdateData);
 
-            try {
-              const directResult = await ringItem.update(directUpdateData);
-              console.log(`Direct update result:`, directResult);
-              console.log(`Direct update successful:`, !!directResult);
-            } catch (directError) {
-              console.error(`Direct update failed:`, directError);
+                try {
+                  const directResult = await ringItem.update(directUpdateData);
+                  console.log(`Direct update result:`, directResult);
+                  console.log(`Direct update successful:`, !!directResult);
+                } catch (directError) {
+                  console.error(`Direct update failed:`, directError);
+                }
+              }
+            } else {
+              throw new Error('Ring item not found in actor');
             }
+          } catch (flagError) {
+            console.error(`Flag update failed:`, flagError);
+            // Final fallback to embedded document update
+            console.log(`Trying embedded document update as final fallback...`);
+            const embeddedUpdateData = {
+              _id: this.ring.id,
+              [`system.flags.${MODULE_ID}.storedSpells`]: ringData.storedSpells
+            };
+            console.log(`Embedded update data:`, embeddedUpdateData);
+            const updateResult = await this.actor.updateEmbeddedDocuments('Item', [embeddedUpdateData]);
+            console.log(`Embedded update result:`, updateResult);
           }
-
         } else {
           // Ring is a world item, update directly
           console.log(`Updating ring directly (world item)...`);
           const updateData = {
-            [`system.flags.${MODULE_ID}`]: ringData
+            [`system.flags.${MODULE_ID}.storedSpells`]: ringData.storedSpells
           };
-          updateResult = await this.ring.update(updateData);
+          const updateResult = await this.ring.update(updateData);
           console.log(`Direct update result:`, updateResult);
         }
 
-        // Verify the update was successful
-        if (!updateResult) {
-          throw new Error('Update operation returned null or undefined');
-        }
-
-        // Comprehensive debugging
+        // Comprehensive debugging (removed updateResult verification since setFlag/update methods handle their own validation)
         console.log('Waiting for update to propagate...');
-        await new Promise(resolve => setTimeout(resolve, 100));
 
-        console.log('=== FRESH DATA RETRIEVAL ===');
-        const freshActor = game.actors.get(this.actor.id);
-        const freshRing = freshActor?.items?.get(this.ring.id);
-        console.log('Fresh actor:', freshActor?.name);
-        console.log('Fresh ring:', freshRing?.name);
-        console.log('Fresh ring system.flags:', freshRing?.system?.flags);
-        console.log('Fresh ring flags[MODULE_ID]:', freshRing?.system?.flags?.[MODULE_ID]);
-
-        // Try multiple ways to get the data
-        const flagData1 = freshRing?.system?.flags?.[MODULE_ID];
-        const flagData2 = freshRing?.getFlag?.(MODULE_ID, 'storedSpells');
-        const flagData3 = freshRing?.flags?.[MODULE_ID];
-
-        console.log('Method 1 (system.flags):', flagData1);
-        console.log('Method 2 (getFlag):', flagData2);
-        console.log('Method 3 (direct flags):', flagData3);
-
-        // Check if the data exists anywhere
-        if (flagData1?.storedSpells?.length > 0) {
-          console.log('✅ Data found via system.flags!');
-          console.log('Stored spells:', flagData1.storedSpells);
-        } else if (flagData2?.length > 0) {
-          console.log('✅ Data found via getFlag!');
-          console.log('Stored spells:', flagData2);
-        } else if (flagData3?.storedSpells?.length > 0) {
-          console.log('✅ Data found via direct flags!');
-          console.log('Stored spells:', flagData3.storedSpells);
-        } else {
-          console.log('❌ No data found in any location');
-        }
-        console.log('=== END FRESH DATA RETRIEVAL ===');
+        // Update our reference
+        this.ring = this.actor.items.get(this.ring.id) || game.items.get(this.ring.id) || this.ring;
 
       }
     } catch (error) {
